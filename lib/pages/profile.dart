@@ -1,0 +1,49 @@
+import 'package:flutter/material.dart';
+
+class Profile extends StatefulWidget{
+  const Profile({Key? key}) : super(key: key);
+
+  @override
+  State<Profile> createState() => _ProfileState();
+}
+
+class _ProfileState extends State<Profile>{
+  @override
+  Widget build(BuildContext context){
+    return Scaffold(
+      body: Container(
+        margin: EdgeInsets.only(top: 10, left: 20, right: 20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          color: Color.fromRGBO(54, 105, 201, 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.3),
+              spreadRadius: 5,
+              blurRadius: 7,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: SizedBox(
+          height: 100,
+          width: double.infinity,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                margin: EdgeInsets.only(left: 20),
+                child: CircleAvatar(
+                  radius: 30,
+                  backgroundImage: AssetImage('assets/images/profile.jpg'),
+                ),
+              ),
+              Text('Profile Page'),
+              Text('This is the profile page'),
+            ],
+          ),
+        ),
+      )
+    );
+  }
+}
