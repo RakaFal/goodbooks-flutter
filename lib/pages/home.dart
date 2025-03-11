@@ -4,6 +4,7 @@ import 'package:goodbooks_flutter/models/banner_models.dart';
 import 'package:goodbooks_flutter/models/best_product_models.dart';
 import 'package:goodbooks_flutter/models/category_models.dart';
 import 'package:goodbooks_flutter/base/navbar.dart';
+import 'dart:math';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -15,7 +16,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<CategoryModels> categories = [];
   List<BannerModel> banners = [];
-  List<BestproductModels> product = [];
+  List<BestproductModels> bestproduct = [];
 
   @override
   void initState() {
@@ -34,7 +35,7 @@ class _HomePageState extends State<HomePage> {
   }
   
   void _getProduct() {
-    product = BestproductModels.getProducts();
+    bestproduct = BestproductModels.getProducts();
   }
 
   @override
@@ -52,12 +53,52 @@ class _HomePageState extends State<HomePage> {
             _categorylist(),
             const SizedBox(height: 20),
             _bestProductList(),
+            const SizedBox(height: 20),
+            _bestSellerProductList()
           ],
         ),
       ),
     );
   }
 
+  Column _bestSellerProductList() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 20),
+          child: Text(
+            'Best Seller',
+            style: TextStyle(
+              color: Color.fromRGBO(12, 26, 48, 1),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 250,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            shrinkWrap: true, 
+            physics: BouncingScrollPhysics(), 
+            children: [
+              const SizedBox(width: 20),
+              Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: bestproduct.map((bestproduct) => _buildProductItem(bestproduct)).toList(),
+              ),
+              const SizedBox(width: 20),
+            ],
+          ),
+        ),
+        const SizedBox(height: 50),
+      ],
+    );
+
+  }
   Column _bestProductList() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,7 +126,7 @@ class _HomePageState extends State<HomePage> {
               Wrap(
                 spacing: 16,
                 runSpacing: 16,
-                children: product.map((product) => _buildProductItem(product)).toList(),
+                children: bestproduct.map((bestproduct) => _buildProductItem(bestproduct)).toList(),
               ),
               const SizedBox(width: 20),
             ],
@@ -96,7 +137,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Container _buildProductItem(BestproductModels products) {
+  Container _buildProductItem(BestproductModels bestproduct) {
     return Container(
       width: 160,
       decoration: BoxDecoration(
@@ -117,7 +158,7 @@ class _HomePageState extends State<HomePage> {
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             child: Image.asset(
-              products.imagePath, 
+              bestproduct.imagePath, 
               width: double.infinity,
               height: 150,
               fit: BoxFit.fill,
@@ -129,7 +170,7 @@ class _HomePageState extends State<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  products.title, 
+                  bestproduct.title, 
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -139,7 +180,7 @@ class _HomePageState extends State<HomePage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Rp. ${products.price?.toStringAsFixed(0) ?? "0"}', // Null check
+                  'Rp. ${bestproduct.price.toStringAsFixed(0) ?? "0"}', // Null check
                   style: const TextStyle(
                     color: Color.fromRGBO(254, 58, 48, 1),
                     fontWeight: FontWeight.bold,
@@ -152,7 +193,7 @@ class _HomePageState extends State<HomePage> {
                     const Icon(Icons.star, color: Colors.amber, size: 16),
                     const SizedBox(width: 4),
                     Text(
-                      '${products.rating?.toStringAsFixed(1) ?? "0.0"} (${products.reviews ?? 0} reviews)', // Null check
+                      '${bestproduct.rating.toStringAsFixed(1) ?? "0.0"} (${bestproduct.reviews ?? 0} reviews)', // Null check
                       style: const TextStyle(
                         color: Color.fromRGBO(12, 26, 48, 1),
                         fontSize: 12,
@@ -178,7 +219,7 @@ class _HomePageState extends State<HomePage> {
         child: const CircularProgressIndicator(),
       );
     }
-    
+    banners.shuffle(Random());
     return Container(
       height: 200,
       margin: const EdgeInsets.symmetric(vertical: 10),
@@ -278,7 +319,7 @@ class _HomePageState extends State<HomePage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(
+                        SizedBox(
                           width: 50,
                           height: 50,
                           child: Icon(

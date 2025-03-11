@@ -70,6 +70,7 @@ flutter:
     - assets/images/Hari-Buku-Nasional_Twitter-min.png
     - assets/images/The_4-Hour_Workweek.jpg
     - assets/images/Logo.png
+    - assets/images/Banner_default.png
 
   fonts:
     - family: DM Sans

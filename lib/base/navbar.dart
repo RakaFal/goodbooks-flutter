@@ -4,7 +4,7 @@ import 'package:goodbooks_flutter/pages/home.dart';
 import 'package:goodbooks_flutter/pages/profile.dart';
 
 class NavBar extends StatefulWidget {
-  const NavBar({Key? key}) : super(key: key);
+  const NavBar({super.key});
 
   @override
   State<NavBar> createState() => _NavBarState();
@@ -15,14 +15,14 @@ class _NavBarState extends State<NavBar> {
 
   final List<Widget> _pages = [
     const HomePage(),
-    const Center(child: Text('Search Page')),
+    const Center(child: Text('Wishlist Page')),
     const Center(child: Text('Library Page')),
     const Profile(),
   ];
 
   final List<String> _titles = [
     'Goodbooks',
-    'Search',
+    'Wishlist',
     'Library',
     'Profile',
   ];
@@ -44,7 +44,7 @@ class _NavBarState extends State<NavBar> {
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
+          BottomNavigationBarItem(icon: Icon(Icons.heat_pump_rounded), label: 'Wishlist'),
           BottomNavigationBarItem(icon: Icon(Icons.book), label: 'Library'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],

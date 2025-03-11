@@ -4,7 +4,7 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:goodbooks_flutter/base/navbar.dart';
 
 class Splashscreen extends StatefulWidget {
-  const Splashscreen({Key? key}) : super(key: key);
+  const Splashscreen({super.key});
 
   @override
   State<Splashscreen> createState() => _SplashscreenState();
