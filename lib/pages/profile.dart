@@ -35,7 +35,7 @@ class _ProfileState extends State<Profile>{
                 margin: EdgeInsets.only(left: 20),
                 child: CircleAvatar(
                   radius: 30,
-                  backgroundImage: AssetImage('assets/images/profile.jpg'),
+                  backgroundImage: NetworkImage('https://www.google.com/url?sa=i&url=https%3A%2F%2Fwww.istockphoto.com%2Fphotos%2Fcorporate-profile-picture&psig=AOvVaw3Fn5EL7EyW3_iJWu_F9p9J&ust=1741920875804000&source=images&cd=vfe&opi=89978449&ved=0CBEQjRxqFwoTCJDk742HhowDFQAAAAAdAAAAABAI'),
                 ),
               ),
               Text('Profile Page'),

@@ -4,6 +4,7 @@ import 'package:goodbooks_flutter/models/banner_models.dart';
 import 'package:goodbooks_flutter/models/best_product_models.dart';
 import 'package:goodbooks_flutter/models/category_models.dart';
 import 'package:goodbooks_flutter/base/navbar.dart';
+import 'LoginPage.dart';
 import 'dart:math';
 
 class HomePage extends StatefulWidget {
@@ -18,25 +19,45 @@ class _HomePageState extends State<HomePage> {
   List<BannerModel> banners = [];
   List<BestproductModels> bestproduct = [];
 
-  @override
-  void initState() {
-    super.initState();
-    _getCategories();
-    _getBanners();
-    _getProduct();
-  }
+@override
+void initState() {
+  super.initState();
+  _getCategories();
+  _getBanners();
+  _getProduct();
 
-  void _getCategories() {
-    categories = CategoryModels.getCategories();
-  }
+  // Tampilkan modal login otomatis setelah halaman dimuat
+  Future.delayed(Duration(milliseconds: 300), () {
+    _showLoginModal();
+  });
+}
 
-  void _getBanners() {
-    banners = BannerModel.getBanners();
-  }
-  
-  void _getProduct() {
-    bestproduct = BestproductModels.getProducts();
-  }
+void _getCategories() {
+  categories = CategoryModels.getCategories();
+}
+
+void _getBanners() {
+  banners = BannerModel.getBanners();
+}
+
+void _getProduct() {
+  bestproduct = BestproductModels.getProducts();
+}
+
+void _showLoginModal() {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    barrierColor: Colors.black.withOpacity(0.7), // Gelapin background biar fokus ke modal
+    enableDrag: false, // Jangan bisa swipe turun buat nutup
+    isDismissible: false, // Jangan bisa tap di luar buat nutup
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (context) => const LoginPage(), // Ganti dengan halaman login kamu
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {

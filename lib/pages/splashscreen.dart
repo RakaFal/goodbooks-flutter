@@ -1,7 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:goodbooks_flutter/base/navbar.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:goodbooks_flutter/base/navbar.dart';
+import 'package:goodbooks_flutter/pages/LoginPage.dart';
 
 class Splashscreen extends StatefulWidget {
   const Splashscreen({super.key});
@@ -16,7 +17,7 @@ class _SplashscreenState extends State<Splashscreen> {
     super.initState();
     Future.delayed(const Duration(seconds: 3), () {
       Navigator.of(context).pushReplacement(
-        CupertinoPageRoute(builder: (ctx) => const NavBar()),
+        CupertinoPageRoute(builder: (ctx) => NavBar()),
       );
     });
   }
