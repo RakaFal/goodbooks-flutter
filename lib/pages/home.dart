@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:goodbooks_flutter/models/banner_models.dart';
-import 'package:goodbooks_flutter/models/best_product_models.dart';
+import 'package:goodbooks_flutter/models/product_models.dart';
 import 'package:goodbooks_flutter/models/category_models.dart';
 import 'package:goodbooks_flutter/pages/Login/LoginDialog.dart';
 import 'package:goodbooks_flutter/pages/Login/LoginPage.dart';
 import 'package:goodbooks_flutter/base/navbar.dart';
 import 'package:goodbooks_flutter/pages/BookDetail.dart';
 import 'package:goodbooks_flutter/provider/WishlistProvider.dart';
+import 'package:goodbooks_flutter/provider/product_services.dart';
 import 'package:provider/provider.dart';
 import 'package:goodbooks_flutter/provider/AuthProvider.dart';
 import 'dart:math';
@@ -21,22 +22,49 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   late List<CategoryModels> categories;
   late List<BannerModel> banners;
-  late List<BestproductModels> bestproduct;
+  List<ProductModel> bestproduct = [];
+  List<ProductModel> bestsellerProducts = [];
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    categories = [];
-    banners = [];
-    bestproduct = [];
-    
-    Future.delayed(Duration.zero, () {
-      if (mounted) {
-        _loadData();
-        _checkLoginStatus();
-      }
-    });
+    categories = CategoryModels.getCategories(); 
+    banners = BannerModel.getBanners();
+    _loadProducts(); 
+    _checkLoginStatus();
   }
+    
+Future<void> _loadProducts() async {
+  try {
+    final productService = ProductService();
+    final results = await Future.wait([
+      productService.getProducts(),
+      productService.getBestsellers(), 
+    ]);
+
+    if (mounted) {
+      setState(() {
+        bestproduct = results[0];
+        bestsellerProducts = results[1];
+        isLoading = false;
+      });
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() => isLoading = false);
+    }
+    debugPrint('Error loading products: $e');
+    
+    // Tampilkan error ke user
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Gagal memuat data: ${e.toString()}'),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+}
 
   void _checkLoginStatus() async {
     try {
@@ -48,36 +76,6 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       debugPrint('Login check error: $e');
     }
-  }
-
-  void _loadData() {
-    Future.microtask(() {
-      if (mounted) {
-        setState(() {
-          categories = CategoryModels.getCategories();
-          banners = BannerModel.getBanners();
-          bestproduct = BestproductModels.getProducts();
-        });
-      }
-    });
-  }
-
-  void _getCategories() {
-    setState(() {
-      categories = CategoryModels.getCategories();
-    });
-  }
-
-  void _getBanners() {
-    setState(() {
-      banners = BannerModel.getBanners();
-    });
-  }
-
-  void _getProduct() {
-    setState(() {
-      bestproduct = BestproductModels.getProducts();
-    });
   }
 
   void _showLoginDialog() {
@@ -107,22 +105,25 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _navigateToDetail(BestproductModels product) async {
+  Future<void> _navigateToDetail(ProductModel product) async {
     if (!mounted) return;
     
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => BookDetailPage(
-          bookId: product.bookId,
+          bookId: product.id,
           bookTitle: product.title,
           author: product.author,
           coverImage: product.imagePath,
           rating: product.rating,
           pageCount: product.pageCount,
+          genre: product.genre,
           publisher: product.publisher,
           publishedDate: product.publishedDate,
           description: product.description,
+          isPurchased: product.isPurchased,
+          price: product.price,
         ),
       ),
     );
@@ -153,6 +154,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _bestProductList() {
+    if (isLoading) {
+      return _buildLoadingIndicator(); // Show loading indicator while fetching data
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -191,6 +195,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _bestSellerProductList() {
+    if (isLoading) {
+      return _buildLoadingIndicator();
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -211,7 +218,7 @@ class _HomePageState extends State<HomePage> {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
-            itemCount: bestproduct.length,
+            itemCount: bestsellerProducts.length,
             itemBuilder: (context, index) {
               return Padding(
                 padding: EdgeInsets.only(
@@ -219,7 +226,7 @@ class _HomePageState extends State<HomePage> {
                   right: 16,
                   bottom: 16,
                 ),
-                child: _buildProductItem(bestproduct[index]),
+                child: _buildProductItem(bestsellerProducts[index]),
               );
             },
           ),
@@ -229,7 +236,16 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildProductItem(BestproductModels product) {
+  Widget _buildLoadingIndicator() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 20),
+      child: Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+  }
+
+  Widget _buildProductItem(ProductModel product) {
     return Consumer<WishlistProvider>(
       builder: (context, wishlistProvider, child) {
         return SizedBox(
@@ -369,10 +385,10 @@ class _HomePageState extends State<HomePage> {
                     right: 8,
                     child: IconButton(
                       icon: Icon(
-                        wishlistProvider.isInWishlist(product.bookId)
+                        wishlistProvider.isInWishlist(product.id)
                             ? Icons.favorite
                             : Icons.favorite_border,
-                        color: wishlistProvider.isInWishlist(product.bookId)
+                        color: wishlistProvider.isInWishlist(product.id)
                             ? Colors.red
                             : Colors.grey[600],
                       ),

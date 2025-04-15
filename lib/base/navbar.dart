@@ -54,17 +54,20 @@ class _NavBarState extends State<NavBar> {
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: _selectedIndex == 0,
-        leading: _selectedIndex == 0
-            ? IconButton(
-                icon: SvgPicture.asset(
-                  'assets/icons/menu-svgrepo-com.svg',
-                  height: 30,
-                  width: 30,
-                  color: const Color.fromRGBO(54, 105, 201, 1),
-                ),
-                onPressed: () => _scaffoldKey.currentState?.openDrawer(), // Updated this
-              )
-            : null,
+        leading: IconButton(
+          icon: SvgPicture.asset(
+            'assets/icons/menu-svgrepo-com.svg',
+            height: 30,
+            width: 30,
+            color: const Color.fromRGBO(54, 105, 201, 1),
+            colorFilter: const ColorFilter.mode(
+              Color.fromRGBO(54, 105, 201, 1),
+              BlendMode.srcIn,
+            ),
+          ),
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(), // Updated this
+        ),
+        automaticallyImplyLeading: false,
         actions: _getAppBarActions(_selectedIndex, authProvider),
       ),
       body: IndexedStack(

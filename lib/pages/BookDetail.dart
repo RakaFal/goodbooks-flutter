@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:goodbooks_flutter/provider/WishlistProvider.dart';
-import 'package:goodbooks_flutter/models/best_product_models.dart';
+import 'package:goodbooks_flutter/models/product_models.dart';
+import 'payment/CheckoutPage.dart';
 
 class BookDetailPage extends StatefulWidget {
   final String bookId;
@@ -11,9 +12,12 @@ class BookDetailPage extends StatefulWidget {
   final String coverImage;
   final double rating;
   final int pageCount;
+  final String genre;
   final String publisher;
   final String publishedDate;
   final String description;
+  final bool isPurchased;
+  final double price;
 
   const BookDetailPage({
     super.key,
@@ -23,9 +27,12 @@ class BookDetailPage extends StatefulWidget {
     required this.coverImage,
     required this.rating,
     required this.pageCount,
+    required this.genre,
     required this.publisher,
     required this.publishedDate,
     required this.description,
+    required this.isPurchased,
+    required this.price,
   });
 
   @override
@@ -34,6 +41,32 @@ class BookDetailPage extends StatefulWidget {
 
 class _BookDetailPageState extends State<BookDetailPage> {
   bool _isExpanded = false;
+
+    void _navigateToCheckout(BuildContext context) {
+    final product = ProductModel(
+      id: widget.bookId,
+      imagePath: widget.coverImage,
+      title: widget.bookTitle,
+      price: widget.price,
+      rating: widget.rating,
+      reviews: 0,
+      author: widget.author,
+      pageCount: widget.pageCount,
+      genre: widget.genre,
+      publisher: widget.publisher,
+      publishedDate: widget.publishedDate,
+      description: widget.description,
+      isBestseller: false,
+      isPurchased: widget.isPurchased,
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CheckoutPage(product: product),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +86,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
                 ),
               ),
               background: Hero(
-                tag: 'book-cover-${widget.bookTitle}',
+                tag: 'book-cover-${widget.bookId}',
                 child: Image.asset(
                   widget.coverImage,
                   fit: BoxFit.cover,
@@ -112,6 +145,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
                       _buildInfoChip(Icons.menu_book, '${widget.pageCount} pages'),
                       _buildInfoChip(Icons.account_balance, widget.publisher),
                       _buildInfoChip(Icons.calendar_today, widget.publishedDate),
+                      _buildInfoChip(Icons.category, widget.genre),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -206,11 +240,21 @@ class _BookDetailPageState extends State<BookDetailPage> {
       children: [
         Expanded(
           child: ElevatedButton.icon(
-            icon: const Icon(Icons.menu_book),
-            label: const Text('Read Now'),
-            onPressed: () {},
+            icon: Icon(widget.isPurchased ? Icons.menu_book : Icons.shopping_cart),
+            label: Text(widget.isPurchased 
+              ? 'Read Now' 
+              : 'Buy Now - Rp${widget.price.toStringAsFixed(0)}'),
+            onPressed: () {
+              if (widget.isPurchased) {
+
+              } else {
+                _navigateToCheckout(context);
+              }
+            },
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: widget.isPurchased ? Colors.white : Colors.blue,
+              foregroundColor: widget.isPurchased ? Colors.blue : Colors.white,
             ),
           ),
         ),
@@ -235,10 +279,22 @@ class _BookDetailPageState extends State<BookDetailPage> {
             padding: const EdgeInsets.all(16),
           ),
           onPressed: () {
-            final book = BestproductModels.fromId(widget.bookId);
-            if (book != null) {
-              wishlistProvider.toggleWishlist(book);
-            }
+            final product = ProductModel(
+              id: widget.bookId,
+              imagePath: widget.coverImage,
+              title: widget.bookTitle,
+              price: widget.price,
+              rating: widget.rating,
+              reviews: 0, 
+              author: widget.author,
+              pageCount: widget.pageCount,
+              genre: widget.genre,
+              publisher: widget.publisher,
+              publishedDate: widget.publishedDate,
+              description: widget.description,
+              isBestseller: widget.isPurchased,
+            );
+            wishlistProvider.toggleWishlist(product);
           },
         ),
       ],

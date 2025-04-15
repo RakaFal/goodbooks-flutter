@@ -147,7 +147,7 @@ class _WishlistPageState extends State<WishlistPage> {
                           right: 8,
                           child: IconButton(
                             icon: Icon(
-                              wishlistProvider.isInWishlist(book.bookId)
+                              wishlistProvider.isInWishlist(book.id)
                                   ? Icons.favorite
                                   : Icons.favorite_border,
                               color: Colors.red,
