@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1083611783454",
+    "project_id": "goodbooks-flutter",
+    "storage_bucket": "goodbooks-flutter.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1083611783454:android:f5e0a0f2fa98c5fc7fe90f",
+        "android_client_info": {
+          "package_name": "com.example.goodbooks_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDLXdKZOrSNOVR7MOPk2lObNKz1fx48MOE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

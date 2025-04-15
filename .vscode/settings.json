@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "D:/College/Semester 4/Pemrograman Mobile (Praktikum)/goodbooks-flutter/linux"
+    "cmake.sourceDirectory": "D:/College/Semester 4/Pemrograman Mobile (Praktikum)/goodbooks-flutter/linux",
+    "java.configuration.updateBuildConfiguration": "interactive"
 }
