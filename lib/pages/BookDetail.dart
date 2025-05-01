@@ -3,7 +3,7 @@ import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:goodbooks_flutter/provider/WishlistProvider.dart';
 import 'package:goodbooks_flutter/models/product_models.dart';
-import 'payment/CheckoutPage.dart';
+import './checkout/CheckoutPage.dart';
 
 class BookDetailPage extends StatefulWidget {
   final String bookId;

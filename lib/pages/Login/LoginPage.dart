@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:goodbooks_flutter/base/NavBar.dart';
 import 'package:goodbooks_flutter/pages/Login/ResetPasswordPage.dart';
 import 'package:goodbooks_flutter/pages/Login/RegisterPage.dart';
-import 'package:provider/provider.dart';
 import 'package:goodbooks_flutter/provider/AuthProvider.dart';
+import 'package:goodbooks_flutter/pages/Login/LoginDialog.dart';
+import 'package:goodbooks_flutter/theme/apptheme.dart';
+import 'package:goodbooks_flutter/config/performance_config.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -77,7 +81,7 @@ class _LoginPageState extends State<LoginPage> {
             // Sign In Button
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Color.fromRGBO(54, 105, 201, 1),
+                backgroundColor: const Color.fromRGBO(54, 105, 201, 1),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -96,7 +100,7 @@ class _LoginPageState extends State<LoginPage> {
                 TextButton(
                   onPressed: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => ResetPasswordPage()),
+                    MaterialPageRoute(builder: (_) =>  ResetPasswordPage()),
                   ),
                   child: const Text("Forgot Password"),
                 ),
@@ -122,63 +126,89 @@ class _LoginPageState extends State<LoginPage> {
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
-    // Validation
+    // Validasi input
     if (email.isEmpty || password.isEmpty) {
-      _showErrorSnackbar(context, "Email dan password harus diisi!");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email dan password harus diisi')),
+      );
       return;
     }
-
-    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
-      _showErrorSnackbar(context, "Format email tidak valid!");
-      return;
-    }
-
-    if (password.length < 6) {
-      _showErrorSnackbar(context, "Password minimal 6 karakter!");
-      return;
-    }
-
-    // Show loading
-    _showLoadingSnackbar(context);
 
     try {
-      // Call login method with email and password
-      await Provider.of<AuthProvider>(context, listen: false).loginWithEmailAndPassword(email, password);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.loginWithEmailAndPassword(email, password);
       
-      // On success, navigate to NavBar
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const NavBar()),
-          (route) => false,
-        );
+      // Jika berhasil, navigasi ke home
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const NavBar()),
+      );
+      
+    } on FirebaseAuthException catch (e) {
+      String errorMessage;
+      switch (e.code) {
+        case 'user-not-found':
+          errorMessage = 'Email tidak terdaftar';
+          break;
+        case 'wrong-password':
+          errorMessage = 'Password salah';
+          break;
+        default:
+          errorMessage = 'Terjadi kesalahan: ${e.message}';
       }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage)),
+      );
     } catch (e) {
-      if (mounted) {
-        Navigator.of(context).pop(); // Remove loading snackbar
-        _showErrorSnackbar(context, "Login gagal: ${e.toString()}");
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Terjadi kesalahan: $e')),
+      );
     }
+  }
+
+  void _handleFirebaseError(BuildContext context, FirebaseAuthException e) {
+    String message;
+    switch (e.code) {
+      case 'user-not-found':
+        message = "Email tidak terdaftar";
+        break;
+      case 'wrong-password':
+        message = "Password salah";
+        break;
+      case 'too-many-requests':
+        message = "Terlalu banyak percobaan. Coba lagi nanti";
+        break;
+      case 'network-request-failed':
+        message = "Gagal terhubung ke jaringan";
+        break;
+      default:
+        message = "Login gagal: ${e.message}";
+    }
+    _showErrorSnackbar(context, message);
+  }
+
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason> _showLoadingSnackbar(BuildContext context) {
+    return ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            CircularProgressIndicator(color: Colors.white),
+            SizedBox(width: 16),
+            Text("Sedang memproses login..."),
+          ],
+        ),
+        backgroundColor: Colors.blue,
+        duration: Duration(minutes: 1),
+      ),
+    );
   }
 
   void _showErrorSnackbar(BuildContext context, String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  void _showLoadingSnackbar(BuildContext context) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please wait... Logging in..."),
-          backgroundColor: Colors.blue,
-        ),
-      );
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 }

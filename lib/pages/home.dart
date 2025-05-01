@@ -394,6 +394,10 @@ Future<void> _loadProducts() async {
                       ),
                       iconSize: 24,
                       onPressed: () {
+                        if (!Provider.of<AuthProvider>(context, listen: false).isLoggedIn) {
+                          _showLoginDialog();
+                          return;
+                        }
                         wishlistProvider.toggleWishlist(product);
                       },
                     ),
