@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:goodbooks_flutter/provider/AuthProvider.dart';
 import 'package:provider/provider.dart';
 import 'package:goodbooks_flutter/pages/login/ResetPasswordPage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -15,6 +18,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
+  bool _isUploading = false;
 
   @override
   void initState() {
@@ -31,6 +35,67 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _emailController.dispose();
     _phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!authProvider.isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login first')),
+      );
+      return;
+    }
+
+    final ImagePicker picker = ImagePicker();
+    
+    try {
+      final XFile? pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512, // Resize image to reduce storage usage
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+
+      if (pickedFile == null) return; // User canceled the picker
+
+      setState(() {
+        _isUploading = true;
+      });
+
+      // Upload to Firebase Storage
+      final String fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final Reference storageRef = FirebaseStorage.instance
+          .ref()
+          .child('profile_images')
+          .child(fileName);
+
+      final File imageFile = File(pickedFile.path);
+      final UploadTask uploadTask = storageRef.putFile(imageFile);
+
+      // Get download URL after upload completes
+      final TaskSnapshot taskSnapshot = await uploadTask;
+      final String downloadUrl = await taskSnapshot.ref.getDownloadURL();
+
+      // Update user profile with new image URL
+      await authProvider.updateUserProfile(
+        name: authProvider.user!.name,
+        email: authProvider.user!.email,
+        phone: authProvider.user!.phone,
+        profileImageUrl: downloadUrl,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile picture updated successfully')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update profile picture: $e')),
+      );
+    } finally {
+      setState(() {
+        _isUploading = false;
+      });
+    }
   }
 
   @override
@@ -72,22 +137,47 @@ class _EditProfilePageState extends State<EditProfilePage> {
           child: Column(
             children: [
               const SizedBox(height: 20),
-              Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  const CircleAvatar(
-                    radius: 50,
-                    backgroundImage: AssetImage('assets/images/download.png'),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color.fromRGBO(54, 105, 201, 1),
-                      borderRadius: BorderRadius.circular(20),
+              // Make the entire profile image area tappable
+              InkWell(
+                onTap: _isUploading ? null : _pickAndUploadImage,
+                child: Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    // Profile Image
+                    authProvider.isLoggedIn && authProvider.user?.profileImageUrl.isNotEmpty == true
+                        ? CircleAvatar(
+                            radius: 50,
+                            backgroundImage: NetworkImage(authProvider.user!.profileImageUrl),
+                            backgroundColor: Colors.grey[300],
+                            onBackgroundImageError: (exception, stackTrace) {
+                              debugPrint('Error loading profile image: $exception');
+                              // Fallback to default image on error
+                            },
+                          )
+                        : const CircleAvatar(
+                            radius: 50,
+                            backgroundImage: AssetImage('assets/images/download.png'),
+                          ),
+                    // Edit button overlay
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color.fromRGBO(54, 105, 201, 1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      padding: const EdgeInsets.all(6),
+                      child: _isUploading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.edit, color: Colors.white, size: 20),
                     ),
-                    padding: const EdgeInsets.all(6),
-                    child: const Icon(Icons.edit, color: Colors.white, size: 20),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 30),
               _buildTextField(

@@ -5,9 +5,14 @@ import 'package:goodbooks_flutter/pages/Login/LoginPage.dart';
 import 'package:goodbooks_flutter/pages/profile/editprofile.dart';
 import '../Wishlist.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
@@ -16,20 +21,39 @@ class ProfilePage extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          const CircleAvatar(
-            radius: 50,
-            backgroundImage: AssetImage('assets/images/download.png'),
-          ),
+          // Profile Image
+          authProvider.isLoggedIn && authProvider.user?.profileImageUrl.isNotEmpty == true
+              ? CircleAvatar(
+                  radius: 60,
+                  backgroundImage: NetworkImage(authProvider.user!.profileImageUrl),
+                  backgroundColor: Colors.grey[300],
+                  onBackgroundImageError: (exception, stackTrace) {
+                    debugPrint('Error loading profile image: $exception');
+                    // Fallback to default image on error
+                  },
+                )
+              : const CircleAvatar(
+                  radius: 60,
+                  backgroundImage: AssetImage('assets/images/download.png'),
+                ),
           const SizedBox(height: 20),
           Text(
-            authProvider.isLoggedIn ? 'John Doe' : 'Guest User',
+            authProvider.isLoggedIn ? authProvider.user?.name ?? 'User' : 'Guest',
             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
           Text(
-            authProvider.isLoggedIn ? 'johndoe@example.com' : 'Not logged in',
+            authProvider.isLoggedIn ? authProvider.user?.email ?? 'No email' : 'Not logged in',
             style: TextStyle(color: Colors.grey[600]),
           ),
+          if (authProvider.isLoggedIn && authProvider.user?.phone != null && authProvider.user!.phone.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 5),
+              child: Text(
+                authProvider.user!.phone,
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ),
           const SizedBox(height: 30),
           if (!authProvider.isLoggedIn)
             ElevatedButton(
@@ -58,6 +82,16 @@ class ProfilePage extends StatelessWidget {
               ),
             ),
             _buildListTile(Icons.settings, 'Settings', () {}),
+            _buildListTile(
+              Icons.exit_to_app,
+              'Logout',
+              () async {
+                await authProvider.logout();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Logged out successfully')),
+                );
+              },
+            ),
           ],
         ],
       ),

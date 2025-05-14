@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'ProfilePasswordPage.dart'; // Tambahkan halaman ini
+import 'ProfilePasswordPage.dart';
 import 'UpdatePasswordPage.dart';
+import 'package:provider/provider.dart';
+import 'package:goodbooks_flutter/provider/AuthProvider.dart'; 
 
 class VerificationPage extends StatefulWidget {
   final String phoneNumber;
@@ -14,8 +16,8 @@ class VerificationPage extends StatefulWidget {
 
 class _VerificationPageState extends State<VerificationPage> {
   List<TextEditingController> otpControllers =
-      List.generate(4, (index) => TextEditingController());
-  int countdown = 185; // 3 menit 5 detik
+      List.generate(6, (index) => TextEditingController()); 
+  int countdown = 185; 
   bool canResend = false;
 
   @override
@@ -39,23 +41,31 @@ class _VerificationPageState extends State<VerificationPage> {
     });
   }
 
-  void _verifyOTP() {
+  void _verifyOTP() async {
     String otpCode = otpControllers.map((controller) => controller.text).join();
-    if (otpCode.length == 4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Kode OTP berhasil diverifikasi!")),
-      );
-
-      // Pindah ke halaman yang sesuai berdasarkan source
-      if (widget.source == "register") {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => ProfilePasswordPage()),
+    if (otpCode.length == 6) { // Ubah menjadi 6
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      try {
+        await authProvider.verifyOTP(otpCode, widget.phoneNumber);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Kode OTP berhasil diverifikasi!")),
         );
-      } else if (widget.source == "reset_password") {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => UpdatePasswordPage()),
+
+        // Pindah ke halaman yang sesuai berdasarkan source
+        if (widget.source == "register") {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => ProfilePasswordPage()),
+          );
+        } else if (widget.source == "reset_password") {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => UpdatePasswordPage()),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Verifikasi gagal: ${e.toString()}")),
         );
       }
     } else {
@@ -111,7 +121,7 @@ class _VerificationPageState extends State<VerificationPage> {
             // OTP Input
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(4, (index) {
+              children: List.generate(6, (index) { 
                 return SizedBox(
                   width: 50,
                   child: TextField(
@@ -124,7 +134,7 @@ class _VerificationPageState extends State<VerificationPage> {
                       border: OutlineInputBorder(),
                     ),
                     onChanged: (value) {
-                      if (value.isNotEmpty && index < 3) {
+                      if (value.isNotEmpty && index < 5) { // Ubah menjadi 5
                         FocusScope.of(context).nextFocus();
                       }
                     },

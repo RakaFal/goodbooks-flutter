@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'VerificationPage.dart';
 import "package:goodbooks_flutter/provider/AuthProvider.dart";
+import 'RegisterPageNumber.dart'; // Import halaman RegisterPageNumber
 
-class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+class RegisterPageEmail extends StatefulWidget {
+  const RegisterPageEmail({super.key});
 
   @override
-  _RegisterPageState createState() => _RegisterPageState();
+  _RegisterPageEmailState createState() => _RegisterPageEmailState();
 }
 
-class _RegisterPageState extends State<RegisterPage> {
+class _RegisterPageEmailState extends State<RegisterPageEmail> {
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController nameController = TextEditingController();
@@ -36,7 +37,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final user = await authProvider.signUp(
+      final user = await authProvider.signUpWithEmail(
         name: name,
         email: email,
         phone: '', // No phone in this form, pass empty string
@@ -82,15 +83,11 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      // Make sure AuthProvider has a signInWithGoogle method.
       await authProvider.signInWithGoogle();
 
-      // After Google sign-in success, navigate or show message as needed
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Login with Google successful')),
       );
-
-      // You might want to navigate to home or other page here
     } catch (e) {
       String errorMessage = "Gagal login dengan Google.";
       if (e is Exception) {
@@ -245,6 +242,25 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   const SizedBox(height: 15),
 
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color.fromRGBO(54, 105, 201, 1),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      minimumSize: const Size(double.infinity, 50),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => RegisterPageNumber()),
+                      );
+                    },
+                    child: const Text('Sign Up with Phone Number'),
+                  ),
+                  const SizedBox(height: 20),
+
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
@@ -270,15 +286,13 @@ class _RegisterPageState extends State<RegisterPage> {
                     label: const Text('Login with Google'),
                     onPressed: _isGoogleLoading ? null : _loginWithGoogle,
                   ),
-
                   const SizedBox(height: 20),
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text("Have an Account? "),
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
+                      GestureDetector(onTap: () => Navigator.pop(context),
                         child: const Text(
                           "Sign In",
                           style: TextStyle(color: Color.fromRGBO(54, 105, 201, 1)),
