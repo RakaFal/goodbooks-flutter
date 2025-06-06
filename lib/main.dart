@@ -1,7 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:goodbooks_flutter/pages/login/LoginPage.dart';
+import 'package:goodbooks_flutter/pages/profile/editprofile.dart';
+import 'package:goodbooks_flutter/pages/seller/seller_home.dart';
+import 'package:goodbooks_flutter/pages/seller/add_product_page.dart';
+import 'package:goodbooks_flutter/pages/Wishlist.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart'; // DITAMBAHKAN: Import untuk flutter_bloc
+
+// Import BLoC
+import 'package:goodbooks_flutter/bloc/auth_bloc.dart'; // DITAMBAHKAN: Import untuk AuthBloc
+
+// Import Provider & Konfigurasi
 import 'provider/firebase_options.dart';
 import 'package:goodbooks_flutter/provider/AuthProvider.dart';
 import 'package:goodbooks_flutter/provider/WishlistProvider.dart';
@@ -9,12 +20,11 @@ import 'package:goodbooks_flutter/provider/product_services.dart';
 import 'package:goodbooks_flutter/config/performance_config.dart';
 import 'package:goodbooks_flutter/theme/apptheme.dart';
 import 'package:goodbooks_flutter/data/dummy_data.dart';
+import 'package:goodbooks_flutter/provider/seller_product_provider.dart';
 import 'pages/splashscreen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Start app initialization and run
   runApp(const AppInitializer());
 }
 
@@ -84,18 +94,33 @@ class AppInitializer extends StatelessWidget {
         await _initializeSampleProducts(productService);
       }
 
+      final sellerProductProvider = SellerProductProvider()..loadProducts();
+
       return MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => authProvider),
-          ChangeNotifierProvider(create: (_) => wishlistProvider),
-          Provider<ProductService>(create: (_) => productService),
+          ChangeNotifierProvider.value(value: authProvider),
+          ChangeNotifierProvider.value(value: wishlistProvider),
+          ChangeNotifierProvider.value(value: sellerProductProvider),
+          Provider<ProductService>.value(value: productService),
         ],
+        child: MultiBlocProvider( 
+          providers: [
+            BlocProvider<AuthBloc>(
+              create: (context) => AuthBloc(
+                // Mengambil AuthProvider yang sudah disediakan oleh MultiProvider di atas
+                authProvider: Provider.of<AuthProvider>(context, listen: false),
+              ),
+            ),
+          ],
         child: const MyApp(),
+        ),
       );
     } catch (e) {
       debugPrint('Initialization error: $e');
       // Return error screen widget instead of throwing
       return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: appTheme,
         home: Scaffold(
           body: Center(
             child: Column(
@@ -142,6 +167,13 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: appTheme,
       home: const Splashscreen(),
+      routes: {
+        '/seller-home': (context) => const SellerHomePage(),
+        '/login': (context) => const LoginPage(),
+        '/edit-profile': (context) => const EditProfilePage(),
+        '/wishlist': (context) => const WishlistPage(),
+        '/add-product': (context) => const AddProductPage()
+      },
       builder: (context, child) {
         ErrorWidget.builder = (FlutterErrorDetails details) {
           return Scaffold(

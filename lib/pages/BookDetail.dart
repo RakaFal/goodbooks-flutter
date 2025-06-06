@@ -17,6 +17,7 @@ class BookDetailPage extends StatefulWidget {
   final String publishedDate;
   final String description;
   final bool isPurchased;
+  final bool isBestseller; 
   final double price;
 
   const BookDetailPage({
@@ -32,6 +33,7 @@ class BookDetailPage extends StatefulWidget {
     required this.publishedDate,
     required this.description,
     required this.isPurchased,
+    required this.isBestseller,
     required this.price,
   });
 
@@ -292,7 +294,8 @@ class _BookDetailPageState extends State<BookDetailPage> {
               publisher: widget.publisher,
               publishedDate: widget.publishedDate,
               description: widget.description,
-              isBestseller: widget.isPurchased,
+              isBestseller: widget.isBestseller,
+              isPurchased: widget.isPurchased,
             );
             wishlistProvider.toggleWishlist(product);
           },

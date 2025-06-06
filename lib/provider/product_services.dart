@@ -1,111 +1,137 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
-import '../models/product_models.dart';
-import '../data/dummy_data.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:goodbooks_flutter/models/product_models.dart';
+import 'package:flutter/foundation.dart'; 
+import 'package:goodbooks_flutter/config/supabase_config.dart'; 
+import 'dart:io';
 
 class ProductService {
-  final CollectionReference _productsCollection =
-      FirebaseFirestore.instance.collection('products');
+  final String productsUrl = '${SupabaseConfig.supabaseUrl}/rest/v1/products';
+  final String anonKey = SupabaseConfig.supabaseAnonKey;
 
-  // Add new product
+  Map<String, String> get headers => {
+        'apikey': anonKey,
+        'Authorization': 'Bearer $anonKey',
+        'Content-Type': 'application/json',
+      };
+
+  // 🔥 Add new product
   Future<void> addProduct(ProductModel product) async {
-    try {
-      await _productsCollection.doc(product.id).set(product.toMap());
-    } catch (e) {
-      throw Exception('Failed to add product: $e');
+    final response = await http.post(
+      Uri.parse(productsUrl),
+      headers: headers,
+      body: json.encode(product.toMap()),
+    );
+
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception('Gagal menambahkan produk: ${response.body}');
     }
   }
 
-  // Get product by ID
-  Future<ProductModel?> getProductById(String id) async {
-    try {
-      final doc = await _productsCollection.doc(id).get();
-      return doc.exists ? ProductModel.fromMap(doc.data() as Map<String, dynamic>) : null;
-    } catch (e) {
-      throw Exception('Failed to fetch product: $e');
+  // 🔍 Get all products
+  Future<List<ProductModel>> getProducts({int limit = 10}) async {
+    final url = '$productsUrl?select=*&limit=$limit';
+    final response = await http.get(Uri.parse(url), headers: headers);
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((item) => ProductModel.fromMap(item)).toList();
+    } else {
+      throw Exception('Gagal mengambil produk: ${response.body}');
     }
   }
 
-  // Get all products with pagination
-  Future<List<ProductModel>> getProducts({
-    int limit = 10,
-    DocumentSnapshot? lastDocument,
-  }) async {
-    try {
-      Query query = _productsCollection.limit(limit);
-      if (lastDocument != null) {
-        query = query.startAfterDocument(lastDocument);
-      }
-      final snapshot = await query.get();
-      return snapshot.docs.map((doc) => ProductModel.fromMap(doc.data() as Map<String, dynamic>)).toList();
-    } catch (e) {
-      throw Exception('Failed to fetch products: $e');
-    }
-  }
-
-  // Get bestseller products
+  // ⬇️ Get bestsellers
   Future<List<ProductModel>> getBestsellers({int limit = 5}) async {
-    try {
-      final snapshot = await _productsCollection
-          .where('isBestseller', isEqualTo: true)
-          .limit(limit)
-          .get();
-      return snapshot.docs.map((doc) => ProductModel.fromMap(doc.data() as Map<String, dynamic>)).toList();
-    } catch (e) {
-      throw Exception('Failed to fetch bestsellers: $e');
+    final url = '$productsUrl?select=*&isBestseller=eq.true&limit=$limit';
+    final response = await http.get(Uri.parse(url), headers: headers);
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((item) => ProductModel.fromMap(item)).toList();
+    } else {
+      throw Exception('Gagal memuat bestsellers: ${response.body}');
     }
   }
 
-  Future<List<ProductModel>> getPurchasedBooks() async {
-    final snapshot = await _productsCollection
-        .where('isPurchased', isEqualTo: true)
-        .get();
-    return snapshot.docs
-        .map((doc) => ProductModel.fromMap(doc.data() as Map<String, dynamic>))
-        .toList();
+  // 🧾 Get user's purchased books
+  Future<List<ProductModel>> getPurchasedBooks(String userId) async {
+    final url = '$productsUrl?select=*&isPurchased=eq.true&userId=eq.$userId';
+    final response = await http.get(Uri.parse(url), headers: headers);
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((item) => ProductModel.fromMap(item)).toList();
+    } else {
+      throw Exception('Gagal memuat buku pembelian: ${response.body}');
+    }
   }
 
-
-  // Update product
+  // 🖊️ Update product
   Future<void> updateProduct(ProductModel product) async {
-    try {
-      await _productsCollection.doc(product.id).update(product.toMap());
-    } catch (e) {
-      throw Exception('Failed to update product: $e');
+    final url = '$productsUrl?id=eq.${product.id}';
+    final response = await http.patch(
+      Uri.parse(url),
+      headers: headers,
+      body: json.encode(product.toMap()),
+    );
+
+    if (response.statusCode != 204 && response.statusCode != 200) {
+      throw Exception('Gagal memperbarui produk: ${response.body}');
     }
   }
 
-  // Delete product
+  // 🗑️ Delete product
   Future<void> deleteProduct(String productId) async {
-    try {
-      await _productsCollection.doc(productId).delete();
-    } catch (e) {
-      throw Exception('Failed to delete product: $e');
+    final url = '$productsUrl?id=eq.$productId';
+    final response = await http.delete(Uri.parse(url), headers: headers);
+
+    if (response.statusCode != 204 && response.statusCode != 200) {
+      throw Exception('Gagal menghapus produk: ${response.body}');
     }
   }
 
-  // Upload sample products (for development)
+  // 📤 Upload sample products
   Future<void> uploadSampleProducts(List<ProductModel> products) async {
-    try {
-      final batch = FirebaseFirestore.instance.batch();
-      for (final product in products) {
-        batch.set(_productsCollection.doc(product.id), product.toMap());
+    for (var product in products) {
+      final response = await http.post(
+        Uri.parse(productsUrl),
+        headers: headers,
+        body: json.encode(product.toMap()),
+      );
+
+      if (response.statusCode != 201 && response.statusCode != 200) {
+        debugPrint('Gagal upload: ${product.title}');
       }
-      await batch.commit();
-      debugPrint('Sample products uploaded successfully');
-    } catch (e) {
-      throw Exception('Failed to upload sample products: $e');
     }
   }
 
-  Future<void> uploadDummyProductsToFirebase() async {
-  final productService = ProductService();
-  
-  try {
-    await productService.uploadSampleProducts(dummyProducts);
-    print('Products successfully uploaded to Firebase!');
-  } catch (e) {
-    print('Error uploading products: $e');
+  Future<String?> uploadImageToSupabase(String filePath, String fileName) async {
+    final url = '${SupabaseConfig.supabaseUrl}/storage/v1/object/products/$fileName';
+
+    final imageFile = File(filePath);
+    final headers = {
+      'apikey': SupabaseConfig.supabaseAnonKey,
+      'Authorization': 'Bearer ${SupabaseConfig.supabaseAnonKey}',
+      'Content-Type': 'image/jpeg', // Atau 'image/png'
+    };
+
+    try {
+      final response = await http.put(
+        Uri.parse(url),
+        headers: headers,
+        body: await imageFile.readAsBytes(),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return '${SupabaseConfig.supabaseUrl}/storage/v1/object/public/products/$fileName';
+      } else {
+        debugPrint('Upload gagal: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Error saat upload: $e');
+      return null;
+    }
   }
-}
 }

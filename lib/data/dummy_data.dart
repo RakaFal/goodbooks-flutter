@@ -15,6 +15,7 @@ final List<ProductModel> dummyProducts = [
         publishedDate: '2011',
         description: 'Bagaimana manusia, yang dulunya hanya spesies biasa di antara makhluk hidup lainnya, bisa mendominasi dunia? Sapiens karya Yuval Noah Harari adalah buku yang mengguncang cara kita memahami sejarah dan masa depan umat manusia.\nDari zaman purba hingga era modern, Harari menjelaskan bagaimana Homo sapiens bertahan, berevolusi, dan menciptakan peradaban melalui tiga revolusi utama: Kognitif, Agrikultur, dan Sains. Buku ini mengajak pembaca menelusuri peran mitos, agama, uang, dan teknologi dalam membentuk dunia yang kita kenal saat ini.\nDengan gaya penulisan yang tajam dan penuh wawasan, Sapiens tidak hanya menawarkan fakta sejarah, tetapi juga mengajukan pertanyaan mendalam tentang siapa kita dan ke mana kita akan menuju.',
         isBestseller: true,
+        isPurchased: false,
       ),
       ProductModel(
         imagePath: 'assets/images/Man_Search_For_Meaning.jpg',
@@ -30,6 +31,7 @@ final List<ProductModel> dummyProducts = [
         publishedDate: '1946',
         description: 'Apa yang membuat manusia tetap bertahan meskipun menghadapi penderitaan yang luar biasa? Mans Search for Meaning karya Viktor E. Frankl adalah sebuah kisah yang menggugah jiwa, berdasarkan pengalaman langsung penulis saat bertahan hidup di kamp konsentrasi Nazi.\nLebih dari sekadar memoar, buku ini mengajarkan bahwa makna hidup dapat ditemukan bahkan dalam situasi yang paling menyakitkan. Frankl, seorang psikiater, mengembangkan logoterapi, sebuah teori yang menekankan bahwa motivasi utama manusia bukanlah kesenangan atau kekuasaan, tetapi mencari makna hidup.\nDengan refleksi yang mendalam dan penuh inspirasi, buku ini membantu pembaca memahami bahwa di tengah penderitaan, kita masih memiliki kebebasan untuk memilih bagaimana merespons kehidupan.',
         isBestseller: false,
+        isPurchased: false,
       ),
       ProductModel(
         imagePath: 'assets/images/The_4-Hour_Workweek.jpg',
@@ -45,6 +47,7 @@ final List<ProductModel> dummyProducts = [
         publishedDate: '2007',
         description: 'Bagaimana jika Anda bisa menikmati hidup sekarang, tanpa menunggu pensiun? The 4-Hour Workweek karya Tim Ferriss adalah panduan revolusioner bagi siapa saja yang ingin keluar dari rutinitas kerja 9-to-5 dan merancang gaya hidup yang lebih bebas.\nBuku ini mengajarkan strategi untuk meningkatkan produktivitas, mengotomatisasi pekerjaan, dan menciptakan sumber pendapatan pasif, sehingga Anda bisa bekerja lebih sedikit namun tetap menghasilkan lebih banyak. Dengan konsep DEAL (Definition, Elimination, Automation, Liberation), Ferriss menunjukkan bagaimana siapa pun bisa merancang hidup impian mereka—bepergian keliling dunia, memulai bisnis online, atau sekadar punya lebih banyak waktu untuk menikmati hidup.',
         isBestseller: true,
+        isPurchased: false,
       ),
   // Tambahkan produk lain
 ];

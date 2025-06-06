@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
-import 'package:goodbooks_flutter/base/NavBar.dart';
-import 'package:goodbooks_flutter/pages/Login/ResetPasswordPage.dart';
-import 'package:goodbooks_flutter/pages/Login/RegisterPageEmail.dart';
-import 'package:goodbooks_flutter/provider/AuthProvider.dart';
-import 'package:goodbooks_flutter/pages/Login/LoginDialog.dart';
-import 'package:goodbooks_flutter/theme/apptheme.dart';
-import 'package:goodbooks_flutter/config/performance_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+// BLoC
+import 'package:goodbooks_flutter/bloc/auth_bloc.dart';
+import 'package:goodbooks_flutter/bloc/auth_event.dart';
+import 'package:goodbooks_flutter/bloc/auth_state.dart';
+
+// Provider & Pages
+import 'package:goodbooks_flutter/provider/AuthProvider.dart';
+import 'package:goodbooks_flutter/base/NavBar.dart';
+import 'package:goodbooks_flutter/pages/Login/RegisterPageEmail.dart';
+import 'package:goodbooks_flutter/pages/Login/ResetPasswordPage.dart';
+
+// Theme
+import 'package:goodbooks_flutter/theme/apptheme.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -29,139 +36,220 @@ class _LoginPageState extends State<LoginPage> {
     _loadRememberMe();
   }
 
-  // Memuat status "Remember Me" dari SharedPreferences
   Future<void> _loadRememberMe() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _rememberMe = prefs.getBool('rememberMe') ?? false;
       if (_rememberMe) {
         emailController.text = prefs.getString('email') ?? '';
-        passwordController.text = prefs.getString('password') ?? '';
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 60),
-            IconButton(
-              icon: const Icon(Icons.arrow_back, size: 28),
-              onPressed: () => Navigator.pop(context, false),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              "Welcome back to GoodBooks",
-              style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              "Silahkan masukkan data untuk login",
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 30),
-            
-            // Email Input
-            TextField(
-              controller: emailController,
-              decoration: InputDecoration(
-                labelText: "Email/Phone",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            
-            // Password Input
-            TextField(
-              controller: passwordController,
-              obscureText: !_isPasswordVisible,
-              decoration: InputDecoration(
-                labelText: "Password",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                    color: Colors.grey,
-                  ),
-                  onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
-                ),
-              ),
-            ),
+    final authProvider = Provider.of<AuthProvider>(context);
 
-            // Remember Me Checkbox
-            Row(
-              children: [
-                Checkbox(
-                  value: _rememberMe,
-                  onChanged: (value) {
-                    setState(() {
-                      _rememberMe = value ?? false;
-                    });
-                  },
-                ),
-                const Text("Remember Me"),
-              ],
-            ),
-            const SizedBox(height: 30),
+    return BlocProvider(
+      create: (context) => AuthBloc(authProvider: authProvider),
+      child: Scaffold(
+        body: BlocConsumer<AuthBloc, AuthState>(
+          // 1. Bagian LISTENER: Untuk menangani side effects
+          listener: (context, state) {
+            if (state is AuthSuccess) {
+              _saveRememberMe(emailController.text);
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const NavBar()),
+              );
+            } else if (state is AuthError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(state.message)),
+              );
+            }
+          },
+          // 2. Bagian BUILDER: Untuk membangun ulang UI
+          builder: (context, state) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 60),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, size: 28),
+                    onPressed: () => Navigator.pop(context, false),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    "Welcome back to",
+                    style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+                  ),
+                  const Text(
+                    "GoodBooks",
+                    style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Silahkan masukkan data untuk login",
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 30),
 
-            // Sign In Button
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color.fromRGBO(54, 105, 201, 1),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                minimumSize: const Size(double.infinity, 50),
+                  // Email/Phone Input
+                  TextField(
+                    controller: emailController,
+                    decoration: InputDecoration(
+                      labelText: "Email/Phone",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.blue),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Password Input
+                  TextField(
+                    controller: passwordController,
+                    obscureText: !_isPasswordVisible,
+                    decoration: InputDecoration(
+                      labelText: "Password",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.blue),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(_isPasswordVisible ? Icons.visibility : Icons.visibility_off),
+                        onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+                      ),
+                    ),
+                    onSubmitted: (_) => _submitForm(context),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Remember Me + Forgot Password
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: _rememberMe,
+                            onChanged: (value) =>
+                                setState(() => _rememberMe = value ?? false),
+                          ),
+                          const Text("Remember Me"),
+                        ],
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => ResetPasswordPage()),
+                        ),
+                        child: const Text("Forgot Password?"),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  // Sign In Button
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color.fromRGBO(54, 105, 201, 1),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 50),
+                    ),
+                    onPressed: state is AuthLoading ? null : () => _submitForm(context),
+                    child: state is AuthLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(color: Colors.white),
+                          )
+                        : const Text(
+                            "Sign In",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  const Center(child: Text("OR")),
+                  
+                  const SizedBox(height: 20),
+
+                  // Sign In with Google
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Colors.blue, width: 2),
+                      minimumSize: const Size(double.infinity, 50),
+                    ),
+                    icon: Image.asset('assets/images/google_logo.png', width: 20),
+                    label: const Text("Sign In with Google", 
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    onPressed: state is AuthLoading
+                        ? null
+                        : () => context.read<AuthBloc>().add(GoogleSignInButtonPressed()),
+                  ),
+
+                  const SizedBox(height: 15),
+
+                  // Don't have account?
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text("Don't have an account? "),
+                      TextButton(
+                        onPressed: state is AuthLoading
+                            ? null
+                            : () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => const RegisterPageEmail()),
+                                ),
+                        child: const Text(
+                          "Sign Up",
+                          style: TextStyle(
+                            color: Color.fromRGBO(54, 105, 201, 1),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              onPressed: () => _login(context),
-              child: const Text("Sign In"),
-            ),
-            const SizedBox(height: 20),
-            
-            // Forgot Password & Sign Up
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) =>  ResetPasswordPage()),
-                  ),
-                  child: const Text("Forgot Password"),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const RegisterPageEmail()),
-                  ),
-                  child: const Text(
-                    "Sign Up",
-                    style: TextStyle(color: Color.fromRGBO(54, 105, 201, 1)),
-                  ),
-                ),
-              ],
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Future<void> _login(BuildContext context) async {
+  void _submitForm(BuildContext context) {
+    FocusScope.of(context).unfocus();
+
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
-    // Validasi input
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Email dan password harus diisi')),
@@ -169,93 +257,22 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.loginWithEmailAndPassword(email, password);
-
-      // Simpan status "Remember Me" di SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      if (_rememberMe) {
-        await prefs.setBool('rememberMe', true);
-        await prefs.setString('email', email);
-        await prefs.setString('password', password);
-      } else {
-        await prefs.remove('rememberMe');
-        await prefs.remove('email');
-        await prefs.remove('password');
-      }
-
-      // Jika berhasil, navigasi ke home
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const NavBar()),
-      );
-      
-    } on FirebaseAuthException catch (e) {
-      String errorMessage;
-      switch (e.code) {
-        case 'user-not-found':
-          errorMessage = 'Email tidak terdaftar';
-          break;
-        case 'wrong-password':
-          errorMessage = 'Password salah';
-          break;
-        default:
-          errorMessage = 'Terjadi kesalahan: ${e.message}';
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage)),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Terjadi kesalahan: $e')),
-      );
-    }
-  }
-
-  void _handleFirebaseError(BuildContext context, FirebaseAuthException e) {
-    String message;
-    switch (e.code) {
-      case 'user-not-found':
-        message = "Email tidak terdaftar";
-        break;
-      case 'wrong-password':
-        message = "Password salah";
-        break;
-      case 'too-many-requests':
-        message = "Terlalu banyak percobaan. Coba lagi nanti";
-        break;
-      case 'network-request-failed':
-        message = "Gagal terhubung ke jaringan";
-        break;
-      default:
-        message = "Login gagal: ${e.message}";
-    }
-    _showErrorSnackbar(context, message);
-  }
-
-  ScaffoldFeatureController<SnackBar, SnackBarClosedReason> _showLoadingSnackbar(BuildContext context) {
-    return ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            CircularProgressIndicator(color: Colors.white),
-            SizedBox(width: 16),
-            Text("Sedang memproses login..."),
-          ],
-        ),
-        backgroundColor: Colors.blue,
-        duration: Duration(minutes: 1),
-      ),
+    context.read<AuthBloc>().add(
+      LoginWithEmailButtonPressed(
+        email: email, 
+        password: password
+      )
     );
   }
 
-  void _showErrorSnackbar(BuildContext context, String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
+  Future<void> _saveRememberMe(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_rememberMe) {
+      await prefs.setBool('rememberMe', true);
+      await prefs.setString('email', email);
+    } else {
+      await prefs.remove('rememberMe');
+      await prefs.remove('email');
+    }
   }
 }

@@ -4,13 +4,15 @@ import 'package:goodbooks_flutter/models/product_models.dart';
 import 'package:goodbooks_flutter/models/category_models.dart';
 import 'package:goodbooks_flutter/pages/Login/LoginDialog.dart';
 import 'package:goodbooks_flutter/pages/Login/LoginPage.dart';
-import 'package:goodbooks_flutter/base/navbar.dart';
 import 'package:goodbooks_flutter/pages/BookDetail.dart';
 import 'package:goodbooks_flutter/provider/WishlistProvider.dart';
 import 'package:goodbooks_flutter/provider/product_services.dart';
 import 'package:provider/provider.dart';
 import 'package:goodbooks_flutter/provider/AuthProvider.dart';
-import 'dart:math';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:goodbooks_flutter/theme/apptheme.dart';
+// Import NavBar - Ensure this path points to your modified NavBar that accepts initialIndex
+import 'package:goodbooks_flutter/base/navbar.dart'; 
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -26,142 +28,142 @@ class _HomePageState extends State<HomePage> {
   List<ProductModel> bestsellerProducts = [];
   bool isLoading = true;
 
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   @override
   void initState() {
     super.initState();
-    categories = CategoryModels.getCategories(); 
+    categories = CategoryModels.getCategories();
     banners = BannerModel.getBanners();
-    _loadProducts(); 
-    _checkLoginStatus();
+    _loadProducts();
   }
-    
-Future<void> _loadProducts() async {
-  try {
-    final productService = ProductService();
-    final results = await Future.wait([
-      productService.getProducts(),
-      productService.getBestsellers(), 
-    ]);
 
-    if (mounted) {
-      setState(() {
-        bestproduct = results[0];
-        bestsellerProducts = results[1];
-        isLoading = false;
-      });
-    }
-  } catch (e) {
-    if (mounted) {
-      setState(() => isLoading = false);
-    }
-    debugPrint('Error loading products: $e');
-    
-    // Tampilkan error ke user
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Gagal memuat data: ${e.toString()}'),
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-}
-
-  void _checkLoginStatus() async {
+  Future<void> _loadProducts() async {
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.checkLoginStatus();
-      if (!authProvider.isLoggedIn && mounted) {
-        _showLoginDialog();
+      final productService = ProductService();
+      final results = await Future.wait([
+        productService.getProducts(),
+        productService.getBestsellers(),
+      ]);
+      if (mounted) {
+        setState(() {
+          bestproduct = results[0];
+          bestsellerProducts = results[1];
+          isLoading = false;
+        });
       }
     } catch (e) {
-      debugPrint('Login check error: $e');
+      if (mounted) {
+        setState(() => isLoading = false);
+        if (context.mounted) { 
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal memuat data: $e')),
+          );
+        }
+      }
     }
-  }
-
-  void _showLoginDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => LoginDialog(
-        onLoginPressed: (context) {
-          Navigator.of(context).pop();
-          _navigateToLoginPage();
-        },
-      ),
-    );
-  }
-
-  void _navigateToLoginPage() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginPage()),
-    );
-    
-    if (result == true && mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const NavBar()),
-        (route) => false,
-      );
-    }
-  }
-
-  Future<void> _navigateToDetail(ProductModel product) async {
-    if (!mounted) return;
-    
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => BookDetailPage(
-          bookId: product.id,
-          bookTitle: product.title,
-          author: product.author,
-          coverImage: product.imagePath,
-          rating: product.rating,
-          pageCount: product.pageCount,
-          genre: product.genre,
-          publisher: product.publisher,
-          publishedDate: product.publishedDate,
-          description: product.description,
-          isPurchased: product.isPurchased,
-          price: product.price,
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SingleChildScrollView( 
-          child: Column(
-            children: [
-              _searchField(),
-              const SizedBox(height: 20),
-              _buildBannerSlider(),
-              const SizedBox(height: 20),
-              _categorylist(),
-              const SizedBox(height: 20),
-              _bestProductList(),
-              const SizedBox(height: 20),
-              _bestSellerProductList(),
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        return Scaffold(
+          key: _scaffoldKey,
+          appBar: AppBar(
+            title: const Text(
+              "GoodBooks",
+              style: TextStyle(
+                color: Color.fromRGBO(54, 105, 201, 1),
+                fontSize: 25,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            backgroundColor: Colors.white,
+            elevation: 0,
+            centerTitle: true,
+            leading: IconButton(
+              icon: SvgPicture.asset(
+                'assets/icons/menu-svgrepo-com.svg',
+                height: 30,
+                width: 30,
+                 colorFilter: const ColorFilter.mode( 
+                  Color.fromRGBO(54, 105, 201, 1),
+                  BlendMode.srcIn,
+                ),
+              ),
+              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+            ),
+            actions: [
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chat_bubble_outline),
+                    color: const Color.fromRGBO(54, 105, 201, 1),
+                    onPressed: () {
+                      if (!authProvider.isLoggedIn) {
+                        _showLoginDialog(context);
+                      }
+                      // TODO: Implement navigation to chat page
+                    },
+                  ),
+                  IconButton(
+                    icon: SvgPicture.asset(
+                      'assets/icons/shopping-cart-svgrepo-com.svg',
+                      height: 30,
+                      width: 30,
+                       colorFilter: const ColorFilter.mode( 
+                        Color.fromRGBO(54, 105, 201, 1),
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                    onPressed: () {
+                      if (!authProvider.isLoggedIn) {
+                        _showLoginDialog(context);
+                      }
+                       // TODO: Implement navigation to cart page
+                    },
+                  ),
+                ],
+              ),
             ],
           ),
-        ),
-      ),
+          drawer: _buildDrawer(context, authProvider),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _searchField(),
+                  const SizedBox(height: 20),
+                  _buildBannerSlider(),
+                  const SizedBox(height: 20),
+                  _categorylist(),
+                  const SizedBox(height: 20),
+                  _bestProductList(),
+                  const SizedBox(height: 20),
+                  _bestSellerProductList(),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
   Widget _bestProductList() {
-    if (isLoading) {
-      return _buildLoadingIndicator(); // Show loading indicator while fetching data
+    if (isLoading) return _buildLoadingIndicator();
+    if (bestproduct.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(20.0),
+        child: Center(child: Text("No best products available at the moment.")),
+      );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 20),
+        const Padding(
+          padding: EdgeInsets.only(left: 20),
           child: Text(
             'Best Products',
             style: TextStyle(
@@ -176,14 +178,13 @@ Future<void> _loadProducts() async {
           height: 280,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
             itemCount: bestproduct.length,
             itemBuilder: (context, index) {
               return Padding(
                 padding: EdgeInsets.only(
-                  left: index == 0 ? 20 : 0, 
+                  left: index == 0 ? 20 : 0,
                   right: 16,
-                  bottom: 16,
+                  bottom: 16, 
                 ),
                 child: _buildProductItem(bestproduct[index]),
               );
@@ -195,14 +196,18 @@ Future<void> _loadProducts() async {
   }
 
   Widget _bestSellerProductList() {
-    if (isLoading) {
-      return _buildLoadingIndicator();
+    if (isLoading) return _buildLoadingIndicator();
+    if (bestsellerProducts.isEmpty) {
+       return const Padding(
+        padding: EdgeInsets.all(20.0),
+        child: Center(child: Text("No bestseller products available at the moment.")),
+      );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 20),
+        const Padding(
+          padding: EdgeInsets.only(left: 20),
           child: Text(
             'Best Seller',
             style: TextStyle(
@@ -217,86 +222,92 @@ Future<void> _loadProducts() async {
           height: 280,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
             itemCount: bestsellerProducts.length,
             itemBuilder: (context, index) {
               return Padding(
                 padding: EdgeInsets.only(
                   left: index == 0 ? 20 : 0,
                   right: 16,
-                  bottom: 16,
+                  bottom: 16, 
                 ),
                 child: _buildProductItem(bestsellerProducts[index]),
               );
             },
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 20), 
       ],
     );
   }
 
   Widget _buildLoadingIndicator() {
     return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 20),
-      child: Center(
-        child: CircularProgressIndicator(),
-      ),
+      padding: EdgeInsets.symmetric(vertical: 50), 
+      child: Center(child: CircularProgressIndicator()),
     );
   }
 
   Widget _buildProductItem(ProductModel product) {
     return Consumer<WishlistProvider>(
       builder: (context, wishlistProvider, child) {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false); 
         return SizedBox(
           width: 160,
-          height: 260,
+          height: 260, 
           child: Card(
             elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: () => _navigateToDetail(product),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BookDetailPage(
+                    bookId: product.id,
+                    bookTitle: product.title,
+                    author: product.author,
+                    coverImage: product.imagePath,
+                    rating: product.rating,
+                    pageCount: product.pageCount,
+                    genre: product.genre,
+                    publisher: product.publisher,
+                    publishedDate: product.publishedDate,
+                    description: product.description,
+                    isBestseller: product.isBestseller,
+                    isPurchased: product.isPurchased,
+                    price: product.price,
+                  ),
+                ),
+              ),
               child: Stack(
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Image Section
                       ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(12),
-                        ),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                         child: SizedBox(
                           height: 165,
                           width: double.infinity,
                           child: Image.asset(
-                            product.imagePath,
+                            product.imagePath, 
                             fit: BoxFit.cover,
-                            cacheWidth: 300,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: Colors.grey[200],
-                              child: const Icon(Icons.book, size: 40),
-                            ),
+                            errorBuilder: (_, __, ___) =>
+                                Container(color: Colors.grey[200], child: const Icon(Icons.book, color: Colors.grey)),
                           ),
                         ),
                       ),
-
-                      // Text Content
                       Padding(
                         padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
+                          mainAxisSize: MainAxisSize.min, 
                           children: [
                             if (product.isBestseller ?? false)
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 2),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4, vertical: 1),
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                                   decoration: BoxDecoration(
                                     color: Colors.orange[700],
                                     borderRadius: BorderRadius.circular(4),
@@ -311,40 +322,28 @@ Future<void> _loadProducts() async {
                                   ),
                                 ),
                               ),
-
-                            // Book Title
-                            SizedBox(
-                              height: 30,
-                              child: Text(
-                                product.title,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11,
-                                  height: 1.0,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                            Text(
+                              product.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                                height: 1.2, 
                               ),
                             ),
                             const SizedBox(height: 1),
-
-                            // Author
                             Text(
                               product.author,
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 9,
-                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 9, color: Colors.grey),
                             ),
                             const SizedBox(height: 3),
-
-                            // Price and Rating
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Flexible(
+                                Flexible( 
                                   child: Text(
                                     'Rp${product.price.toStringAsFixed(0)}',
                                     style: const TextStyle(
@@ -352,22 +351,17 @@ Future<void> _loadProducts() async {
                                       fontWeight: FontWeight.bold,
                                       fontSize: 11,
                                     ),
-                                    overflow: TextOverflow.ellipsis,
+                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.star, 
-                                      color: Colors.amber, 
-                                      size: 10),
+                                    const Icon(Icons.star, size: 10, color: Colors.amber),
                                     const SizedBox(width: 1),
                                     Text(
                                       product.rating.toStringAsFixed(1),
-                                      style: const TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
                                     ),
                                   ],
                                 ),
@@ -378,12 +372,12 @@ Future<void> _loadProducts() async {
                       ),
                     ],
                   ),
-
-                  // Wishlist Button
                   Positioned(
                     top: 8,
                     right: 8,
                     child: IconButton(
+                      padding: EdgeInsets.zero, 
+                      constraints: const BoxConstraints(), 
                       icon: Icon(
                         wishlistProvider.isInWishlist(product.id)
                             ? Icons.favorite
@@ -394,8 +388,8 @@ Future<void> _loadProducts() async {
                       ),
                       iconSize: 24,
                       onPressed: () {
-                        if (!Provider.of<AuthProvider>(context, listen: false).isLoggedIn) {
-                          _showLoginDialog();
+                        if (!authProvider.isLoggedIn) { 
+                          _showLoginDialog(context);
                           return;
                         }
                         wishlistProvider.toggleWishlist(product);
@@ -412,17 +406,12 @@ Future<void> _loadProducts() async {
   }
 
   Widget _buildBannerSlider() {
-    if (banners.isEmpty) {
-      return _buildBannerPlaceholder(); 
-    }
-
-    banners.shuffle(Random()); 
+    if (banners.isEmpty) return const SizedBox.shrink(); 
     return SizedBox(
       height: 200,
       child: PageView.builder(
-        controller: PageController(viewportFraction: 0.9),
+        controller: PageController(viewportFraction: 0.9), 
         itemCount: banners.length,
-        physics: const BouncingScrollPhysics(),
         itemBuilder: (context, index) {
           return _buildBannerItem(banners[index]);
         },
@@ -432,7 +421,7 @@ Future<void> _loadProducts() async {
 
   Widget _buildBannerItem(BannerModel banner) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), 
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
@@ -447,12 +436,8 @@ Future<void> _loadProducts() async {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Image.asset(
-          banner.imagePath,
+          banner.imagePath, 
           fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-          cacheWidth: 600,
-          cacheHeight: 300,
           errorBuilder: (context, error, stackTrace) => _buildBannerPlaceholder(),
         ),
       ),
@@ -461,19 +446,21 @@ Future<void> _loadProducts() async {
 
   Widget _buildBannerPlaceholder() {
     return Container(
-      color: Colors.grey[200],
-      child: Center(
-        child: Icon(Icons.image, size: 50, color: Colors.grey[400]),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.grey[200],
       ),
+      child: const Center(child: Icon(Icons.image_search, size: 50, color: Colors.grey)), 
     );
   }
 
   Column _categorylist() {
+    if (categories.isEmpty) return Column(children: const [SizedBox.shrink()]);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 20),
+        const Padding(
+          padding: EdgeInsets.only(left: 20),
           child: Text(
             'Genres',
             style: TextStyle(
@@ -485,49 +472,50 @@ Future<void> _loadProducts() async {
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 100,
+          height: 100, 
           child: ListView.separated(
-            itemCount: categories.length,
             scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            physics: BouncingScrollPhysics(), 
-            separatorBuilder: (context, index) => const SizedBox(width: 32),
+            itemCount: categories.length,
+            padding: const EdgeInsets.symmetric(horizontal: 20), 
+            separatorBuilder: (context, index) => const SizedBox(width: 16), 
             itemBuilder: (context, index) {
-              final hslColor = HSLColor.fromColor(categories[index].boxColor);
+              final category = categories[index];
+              // Reverted iconColor logic to your original implementation
+              final hslColor = HSLColor.fromColor(category.boxColor);
               final iconColor = hslColor.withLightness((hslColor.lightness - 0.2).clamp(0.0, 1.0)).toColor();
 
               return Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
                     width: 70,
                     height: 70,
                     decoration: BoxDecoration(
-                      color: categories[index].boxColor,
+                      color: category.boxColor,
                       borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 50,
-                          height: 50,
-                          child: Icon(
-                            CategoryModels.getIconData(categories[index].iconName),
-                            size: 35,
-                            color: iconColor,
-                          ),
+                       boxShadow: [ 
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
+                    child: Icon(
+                      CategoryModels.getIconData(category.iconName),
+                      size: 35,
+                      color: iconColor, // Using the reverted iconColor
+                    ),
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 8), 
                   Text(
-                    categories[index].name,
-                    style: TextStyle(
+                    category.name,
+                    style: const TextStyle(
                       fontWeight: FontWeight.w500,
                       color: Color.fromRGBO(12, 26, 48, 1),
-                      fontSize: 14
+                      fontSize: 14,
                     ),
+                    textAlign: TextAlign.center,
                   )
                 ],
               );
@@ -538,53 +526,195 @@ Future<void> _loadProducts() async {
     );
   }
 
-  Container _searchField() {
+  Widget _searchField() {
     return Container(
-          margin: EdgeInsets.only(top: 20, left: 20, right: 20),
-          decoration: BoxDecoration(
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                spreadRadius: 0.0,
-                blurRadius: 40,
-                offset: Offset(0, 3),
-              ),
-            ],
+      margin: const EdgeInsets.only(top: 20, left: 20, right: 20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(40), 
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1), 
+            blurRadius: 10, 
+            offset: const Offset(0, 2), 
           ),
-          child: TextField(
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: const Color.fromRGBO(250, 250, 250, 1),
-              hintText: 'Search for books',
-              hintStyle: TextStyle(
-                color: Color.fromRGBO(196, 197, 196, 1),
-                fontSize: 16,
-              ),
-              contentPadding: EdgeInsets.all(15),
-              suffixIcon: SizedBox(
-                width: 100,
-                child: IntrinsicHeight(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      VerticalDivider(
-                        color: Color.fromRGBO(250, 250, 250, 1),
-                        thickness: 0.2,
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: Icon(Icons.search),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(40),
-                borderSide: BorderSide.none
-            ),
+        ],
+      ),
+      child: TextField(
+        decoration: InputDecoration(
+          filled: true,
+          fillColor: Colors.white, 
+          hintText: 'Search for books',
+          hintStyle: const TextStyle(
+            color: Color.fromRGBO(196, 197, 196, 1),
+            fontSize: 16,
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15), 
+          prefixIcon: const Padding( 
+            padding: EdgeInsets.only(left: 15.0, right: 10.0),
+            child: Icon(Icons.search, color: Colors.grey),
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(40),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder( 
+            borderRadius: BorderRadius.circular(40),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder( 
+            borderRadius: BorderRadius.circular(40),
+            borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 1.5), 
           ),
         ),
+         onSubmitted: (value) {
+          debugPrint('Searching for: $value');
+        },
+      ),
+    );
+  }
+
+  Widget _buildDrawer(BuildContext context, AuthProvider authProvider) {
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          DrawerHeader(
+            decoration: const BoxDecoration(
+              color: Color.fromRGBO(54, 105, 201, 1),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const CircleAvatar(
+                  radius: 30,
+                  backgroundColor: Colors.white,
+                  child: Icon(
+                    Icons.person,
+                    size: 40,
+                    color: Color.fromRGBO(54, 105, 201, 1),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  authProvider.isLoggedIn ? authProvider.user?.name ?? 'User' : 'Guest',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  authProvider.isLoggedIn ? authProvider.user?.email ?? 'No email' : 'Not logged in',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.home_outlined, color: Colors.grey),
+            selectedTileColor: Colors.blue[50],
+            title: const Text('Home'),
+            onTap: () {
+              Navigator.pop(context); 
+              // Navigate to NavBar, showing the Home tab (index 0)
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const NavBar(initialIndex: 0)),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.favorite_border, color: Colors.grey),
+            selectedTileColor: Colors.blue[50],
+            title: const Text('Wishlist'),
+            onTap: () {
+              Navigator.pop(context); 
+              if (!authProvider.isLoggedIn) {
+                _showLoginDialog(context);
+                return;
+              }
+              // Navigate to NavBar, showing the Wishlist tab (index 1)
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const NavBar(initialIndex: 1)),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.book_outlined, color: Colors.grey),
+            selectedTileColor: Colors.blue[50],
+            title: const Text('Library'),
+            onTap: () {
+              Navigator.pop(context); 
+              if (!authProvider.isLoggedIn) {
+                _showLoginDialog(context);
+                return;
+              }
+              // Navigate to NavBar, showing the Library tab (index 2)
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const NavBar(initialIndex: 2)),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.person_outline, color: Colors.grey),
+            selectedTileColor: Colors.blue[50],
+            title: const Text('Profile'),
+            onTap: () {
+              Navigator.pop(context); 
+              if (!authProvider.isLoggedIn) {
+                _showLoginDialog(context);
+                return;
+              }
+              // Navigate to NavBar, showing the Profile tab (index 3)
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const NavBar(initialIndex: 3)),
+              );
+            },
+          ),
+          const Divider(),
+          if (authProvider.isLoggedIn)
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.grey),
+              title: const Text('Logout'),
+              onTap: () async {
+                Navigator.pop(context); 
+                await Provider.of<AuthProvider>(context, listen: false).logout();
+                if(mounted){
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LoginPage()),
+                     (route) => false,
+                  );
+                }
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showLoginDialog(BuildContext context) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false, 
+      builder: (dialogContext) => LoginDialog( 
+        onLoginPressed: (ctx) { 
+          Navigator.pop(ctx); 
+          if (mounted) { 
+             Navigator.push(
+              context, 
+              MaterialPageRoute(builder: (_) => const LoginPage()),
+            );
+          }
+        },
+      ),
     );
   }
 }

@@ -41,6 +41,7 @@ class _AddProductPageState extends State<AddProductPage> {
         publishedDate: _publishedDateController.text,
         description: _descriptionController.text,
         isBestseller: _isBestseller,
+        isPurchased: false, 
       );
 
       widget.onProductAdded(newProduct);

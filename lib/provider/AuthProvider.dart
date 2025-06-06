@@ -1,10 +1,12 @@
-import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:goodbooks_flutter/config/supabase_config.dart';
+import 'dart:io';
 
 class User {
   final String name;
@@ -36,17 +38,19 @@ class User {
       };
 }
 
-class AuthProvider extends ChangeNotifier {
+class AuthProvider with ChangeNotifier {
   final fb_auth.FirebaseAuth _firebaseAuth = fb_auth.FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
-
   bool _isLoggedIn = false;
   bool _isAttemptingLogin = false;
   User? _user;
-  String? _verificationId;
+
+  String? _verificationId; 
   int? _resendToken;
 
+  File? _coverImage; 
+
+  String get supabaseUrl => SupabaseConfig.supabaseUrl;
   bool get isLoggedIn => _isLoggedIn;
   bool get isAttemptingLogin => _isAttemptingLogin;
   User? get user => _user;
@@ -58,7 +62,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Fungsi login dengan email dan password
+  // --- Login/Signup ---
   Future<bool> loginWithEmailAndPassword(String email, String password) async {
     _isAttemptingLogin = true;
     notifyListeners();
@@ -73,19 +77,17 @@ class AuthProvider extends ChangeNotifier {
         name: userCredential.user?.displayName ?? 'User',
         email: userCredential.user?.email ?? email,
         phone: userCredential.user?.phoneNumber ?? '',
+        profileImageUrl: userCredential.user?.photoURL ?? '',
       );
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('isLoggedIn', true);
       await _saveUserData();
-      
-      // Also load data from Firestore if available
-      if (userCredential.user != null) {
-        await _loadUserFromFirestore(userCredential.user!.uid);
-      }
-      
+
+      // Simpan ke Supabase
+      await _syncUserToSupabase(userCredential.user!.uid);
+
       return true;
-      
     } on fb_auth.FirebaseAuthException catch (e) {
       String errorMessage;
       switch (e.code) {
@@ -94,9 +96,6 @@ class AuthProvider extends ChangeNotifier {
           break;
         case 'wrong-password':
           errorMessage = 'Password salah';
-          break;
-        case 'user-disabled':
-          errorMessage = 'Akun dinonaktifkan';
           break;
         default:
           errorMessage = 'Login gagal: ${e.message}';
@@ -119,29 +118,27 @@ class AuthProvider extends ChangeNotifier {
       email: 'test@example.com',
       phone: '+6281234567890',
     );
-    
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', true);
     await _saveUserData();
     notifyListeners();
   }
 
-  // Check status login user
   Future<void> checkLoginStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final firebaseUser = _firebaseAuth.currentUser;
-      
-      // Sync antara Firebase Auth dan local storage
+
       if (firebaseUser != null) {
         _isLoggedIn = true;
+        final userId = firebaseUser.uid;
+        final url = '$supabaseUrl/users?id=eq.$userId';
         await prefs.setBool('isLoggedIn', true);
         await loadUserData();
       } else {
         _isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
         if (_isLoggedIn) {
-          // Force logout jika local storage mengatakan logged in tapi Firebase tidak
-          await logout();
+          await logout(); // Force logout jika local menyimpan status tapi Firebase tidak
         }
       }
     } catch (e) {
@@ -152,47 +149,41 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Fungsi Sign-Up yang Lengkap
   Future<User?> signUpWithEmail({
     required String email,
     required String password,
     required String name,
     required String phone,
-    String profileImageUrl = '', // Provide default empty string
+    String profileImageUrl = '',
   }) async {
     _isAttemptingLogin = true;
     notifyListeners();
 
     try {
-      // 1. Buat user di Firebase Authentication
-      final fb_auth.UserCredential userCredential = await _firebaseAuth
-          .createUserWithEmailAndPassword(email: email, password: password)
-          .timeout(const Duration(seconds: 10));
+      final fb_auth.UserCredential userCredential =
+          await _firebaseAuth.createUserWithEmailAndPassword(
+              email: email, password: password);
 
-      // 2. Kirim email verifikasi
+      // Kirim email verifikasi
       await userCredential.user?.sendEmailVerification();
 
-      // 3. Simpan data tambahan ke Firestore
-      await _firestore.collection('users').doc(userCredential.user?.uid).set({
-        'name': name,
-        'email': email,
-        'phone': phone,
-        'profileImageUrl': profileImageUrl,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-        'emailVerified': false,
-      });
-
-      // 4. Update state lokal
-      _isLoggedIn = true;
-      _user = User(
-        name: name, 
-        email: email, 
+      // Simpan ke Supabase
+      await _syncUserToSupabase(
+        userCredential.user!.uid,
+        name: name,
+        email: email,
         phone: phone,
         profileImageUrl: profileImageUrl,
       );
 
-      // 5. Simpan ke SharedPreferences
+      _isLoggedIn = true;
+      _user = User(
+        name: name,
+        email: email,
+        phone: phone,
+        profileImageUrl: profileImageUrl,
+      );
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('isLoggedIn', true);
       await _saveUserData();
@@ -222,47 +213,38 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Fungsi Sign-Up untuk Nomor Telepon
   Future<User?> signUpWithPhone({
     required String phone,
     required String name,
-    String email = '', // Provide default value
-    String password = '', // Make password optional since we're using OTP
+    String email = '',
+    String password = '',
   }) async {
     _isAttemptingLogin = true;
     notifyListeners();
 
     try {
-      // Kirim OTP ke nomor telepon
       await sendOTP(phone);
 
-      // Important: Create a temporary user record
-      // Final user record should be created after OTP verification
-      // We'll use phone number as temporary ID and update it after verification
-      String tempDocId = 'temp_' + phone.replaceAll('+', '').replaceAll(' ', ''); 
-      
-      // Store temp user record with registration timestamp
+      String tempDocId = 'temp_' + phone.replaceAll('+', '').replaceAll(' ', '');
       try {
-        await _firestore.collection('temp_users').doc(tempDocId).set({
-          'name': name,
-          'phone': phone,
-          'email': email,
-          // Hash or omit password in production
-          'registrationTimestamp': FieldValue.serverTimestamp(),
-        });
-      } catch (firestoreError) {
-        debugPrint('Warning: Could not save temporary user data: $firestoreError');
-        // Continue even if temp storage fails
+        // Simpan sementara ke Supabase
+        await http.post(
+          Uri.parse('$supabaseUrl/temp_users'),
+          headers: SupabaseConfig.headers,
+          body: json.encode({
+            'id': tempDocId,
+            'name': name,
+            'phone': phone,
+            'email': email,
+            'registrationTimestamp': DateTime.now().toIso8601String(),
+          }),
+        );
+      } catch (e) {
+        debugPrint('Gagal simpan ke Supabase: $e');
       }
-      
-      // Note: We don't set _isLoggedIn = true here because OTP verification isn't complete
-      // We'll do that in verifyOTP method instead
-      
-      // Store pending user data temporarily
+
       _user = User(name: name, email: email, phone: phone);
-      
-      // Return user object but don't save login state yet
-      return _user;  
+      return _user;
     } catch (e) {
       debugPrint('Phone signup error: $e');
       throw Exception('Pendaftaran dengan nomor telepon gagal: $e');
@@ -271,8 +253,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
-  
-  // Method untuk mengirim OTP
+
   Future<void> sendOTP(String phoneNumber) async {
     _isAttemptingLogin = true;
     notifyListeners();
@@ -304,7 +285,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Method untuk verifikasi OTP
   Future<User?> verifyOTP(String smsCode, String phoneNumber) async {
     _isAttemptingLogin = true;
     notifyListeners();
@@ -314,60 +294,35 @@ class AuthProvider extends ChangeNotifier {
         throw Exception('Verifikasi ID tidak ditemukan');
       }
 
-      final fb_auth.AuthCredential credential = fb_auth.PhoneAuthProvider.credential(
+      final fb_auth.AuthCredential credential =
+          fb_auth.PhoneAuthProvider.credential(
         verificationId: _verificationId!,
         smsCode: smsCode,
       );
 
-      final fb_auth.UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
+      final fb_auth.UserCredential userCredential =
+          await _firebaseAuth.signInWithCredential(credential);
       final fb_auth.User? fbUser = userCredential.user;
-      
+
       if (fbUser == null) {
         throw Exception('Verifikasi berhasil tetapi user tidak ditemukan');
       }
 
-      // Check if user document exists in Firestore
-      final userDocRef = _firestore.collection('users').doc(fbUser.uid);
-      final userDocSnapshot = await userDocRef.get();
-      
-      String userName = fbUser.displayName ?? 'User';
-      String userEmail = fbUser.email ?? '';
-      String userPhone = fbUser.phoneNumber ?? phoneNumber;
-      String userProfileImageUrl = '';
-      
-      // If the document exists, get the existing data
-      if (userDocSnapshot.exists && userDocSnapshot.data() != null) {
-        final userData = userDocSnapshot.data()!;
-        userName = userData['name'] ?? userName;
-        userEmail = userData['email'] ?? userEmail;
-        userPhone = userData['phone'] ?? userPhone;
-        userProfileImageUrl = userData['profileImageUrl'] ?? '';
-        
-        // Update the document with latest info
-        await userDocRef.update({
-          'updatedAt': FieldValue.serverTimestamp(),
-          'lastLogin': FieldValue.serverTimestamp(),
-        });
-      } else {
-        // Document doesn't exist, create it
-        await userDocRef.set({
-          'name': userName,
-          'email': userEmail, 
-          'phone': userPhone,
-          'profileImageUrl': userProfileImageUrl,
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-          'lastLogin': FieldValue.serverTimestamp(),
-        });
-      }
+      // Sync ke Supabase
+      await _syncUserToSupabase(
+        fbUser.uid,
+        name: _user?.name ?? 'User',
+        email: _user?.email ?? fbUser.email ?? '',
+        phone: fbUser.phoneNumber ?? phoneNumber,
+        profileImageUrl: fbUser.photoURL ?? '',
+      );
 
-      // Simpan data user
       _isLoggedIn = true;
       _user = User(
-        name: userName,
-        email: userEmail,
-        phone: userPhone,
-        profileImageUrl: userProfileImageUrl,
+        name: fbUser.displayName ?? _user?.name ?? 'User',
+        email: fbUser.email ?? _user?.email ?? '',
+        phone: fbUser.phoneNumber ?? phoneNumber,
+        profileImageUrl: fbUser.photoURL ?? '',
       );
 
       final prefs = await SharedPreferences.getInstance();
@@ -384,7 +339,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Google Sign-In
   Future<User?> signInWithGoogle() async {
     _isAttemptingLogin = true;
     notifyListeners();
@@ -395,40 +349,31 @@ class AuthProvider extends ChangeNotifier {
         throw Exception('Login dengan Google dibatalkan');
       }
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
-      final fb_auth.AuthCredential credential = fb_auth.GoogleAuthProvider.credential(
+      final fb_auth.AuthCredential credential =
+          fb_auth.GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      final fb_auth.UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
-
+      final fb_auth.UserCredential userCredential =
+          await _firebaseAuth.signInWithCredential(credential);
       final fb_auth.User? fbUser = userCredential.user;
+
       if (fbUser == null) {
         throw Exception('Gagal login dengan Google');
       }
 
-      // Save or update user data in Firestore
-      final userDoc = _firestore.collection('users').doc(fbUser.uid);
-      final docSnapshot = await userDoc.get();
-
-      if (!docSnapshot.exists) {
-        await userDoc.set({
-          'name': fbUser.displayName ?? 'Google User',
-          'email': fbUser.email,
-          'phone': fbUser.phoneNumber ?? '',
-          'profileImageUrl': fbUser.photoURL ?? '',
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-          'emailVerified': fbUser.emailVerified,
-        });
-      } else {
-        await userDoc.update({
-          'updatedAt': FieldValue.serverTimestamp(),
-          'emailVerified': fbUser.emailVerified,
-        });
-      }
+      // Simpan ke Supabase
+      await _syncUserToSupabase(
+        fbUser.uid,
+        name: fbUser.displayName ?? 'Google User',
+        email: fbUser.email ?? '',
+        phone: fbUser.phoneNumber ?? '',
+        profileImageUrl: fbUser.photoURL ?? '',
+      );
 
       _isLoggedIn = true;
       _user = User(
@@ -453,78 +398,76 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Mapping error code ke pesan yang lebih user-friendly
-  String _mapVerificationError(String code) {
-    switch (code) {
-      case 'invalid-phone-number':
-        return 'Nomor telepon tidak valid';
-      case 'too-many-requests':
-        return 'Terlalu banyak permintaan. Coba lagi nanti';
-      case 'quota-exceeded':
-        return 'Kuota verifikasi habis. Hubungi developer';
-      case 'operation-not-allowed':
-        return 'Verifikasi OTP tidak diaktifkan';
-      default:
-        return 'Terjadi kesalahan: $code';
+  Future<void> _syncUserToSupabase(String userId, {String? name, String? email, String? phone, String? profileImageUrl}) async {
+    final url = '$supabaseUrl/users';
+    
+    final body = json.encode({
+      'id': userId,
+      'name': name ?? 'User',
+      'email': email ?? '',
+      'phone': phone ?? '',
+      'profileImageUrl': profileImageUrl ?? '',
+      'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
+      'email_verified': true,
+    });
+
+    // Check apakah user sudah ada di Supabase
+    final response = await http.get(
+      Uri.parse('$url?id=eq.$userId'),
+      headers: SupabaseConfig.headers,
+    );
+
+    if (response.statusCode == 200 && json.decode(response.body).isNotEmpty) {
+      // Update jika sudah ada
+      await http.patch(
+        Uri.parse('$url?id=eq.$userId'),
+        headers: SupabaseConfig.headers,
+        body: body,
+      );
+    } else {
+      // Insert baru jika belum ada
+      await http.post(Uri.parse(url), headers: SupabaseConfig.headers, body: body);
     }
   }
 
-  Future<void> _loadUserFromFirestore(String uid) async {
-    try {
-      final userDoc = await _firestore.collection('users').doc(uid).get();
-      if (userDoc.exists && userDoc.data() != null) {
-        final data = userDoc.data()!;
-        _user = User(
-          name: data['name'] ?? 'User',
-          email: data['email'] ?? 'No email',
-          phone: data['phone'] ?? '',
-          profileImageUrl: data['profileImageUrl'] ?? '',
-        );
-        await _saveUserData();
-        notifyListeners();
-      } else {
-        // If user document doesn't exist but Firebase auth user exists,
-        // create the document with basic info from Firebase Auth
-        final firebaseUser = _firebaseAuth.currentUser;
-        if (firebaseUser != null) {
-          debugPrint('Creating missing user document for ${firebaseUser.uid}');
-          await _firestore.collection('users').doc(uid).set({
-            'name': firebaseUser.displayName ?? 'User',
-            'email': firebaseUser.email ?? '',
-            'phone': firebaseUser.phoneNumber ?? '',
-            'profileImageUrl': firebaseUser.photoURL ?? '',
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-            'emailVerified': firebaseUser.emailVerified,
-          });
-          
-          _user = User(
-            name: firebaseUser.displayName ?? 'User',
-            email: firebaseUser.email ?? '',
-            phone: firebaseUser.phoneNumber ?? '',
-            profileImageUrl: firebaseUser.photoURL ?? '',
-          );
-          await _saveUserData();
-          notifyListeners();
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading user from Firestore: $e');
+  Future<void> _loadUserFromSupabase(String userId) async {
+    final url = '$supabaseUrl/users?id=eq.$userId';
+
+    final response = await http.get(Uri.parse(url), headers: SupabaseConfig.headers);
+
+    if (response.statusCode == 200 && json.decode(response.body).isNotEmpty) {
+      final userData = json.decode(response.body).first;
+      _user = User(
+        name: userData['name'] ?? 'User',
+        email: userData['email'] ?? 'No email',
+        phone: userData['phone'] ?? '',
+        profileImageUrl: userData['profileImageUrl'] ?? '',
+      );
+      await _saveUserData();
+      notifyListeners();
+    } else {
+      // Jika user tidak ditemukan di Supabase, buat baru
+      _user = User(
+        name: 'User',
+        email: 'No email',
+        phone: '',
+        profileImageUrl: '',
+      );
     }
   }
 
-  // Ambil data user yang tersimpan
   Future<void> loadUserData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userJson = prefs.getString('userData');
-      
+
       if (userJson != null) {
-        _user = User.fromJson(Map<String, dynamic>.from(json.decode(userJson)));
+        _user = User.fromJson(json.decode(userJson));
       } else {
         final firebaseUser = _firebaseAuth.currentUser;
         if (firebaseUser != null) {
-          await _loadUserFromFirestore(firebaseUser.uid);
+          await _loadUserFromSupabase(firebaseUser.uid);
         }
       }
       notifyListeners();
@@ -533,18 +476,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Save user data ke local storage
-  Future<void> _saveUserData() async {
-    if (_user == null) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('userData', json.encode(_user!.toJson()));
-    } catch (e) {
-      debugPrint('Error saving user data: $e');
-    }
-  }
-
-  // Fungsi update profile user
   Future<void> updateUserProfile({
     required String name,
     required String email,
@@ -552,47 +483,35 @@ class AuthProvider extends ChangeNotifier {
     String? profileImageUrl,
   }) async {
     try {
-      // Update local state
       _user = User(
         name: name,
         email: email,
         phone: phone,
         profileImageUrl: profileImageUrl ?? _user?.profileImageUrl ?? '',
       );
-      
-      // Save to SharedPreferences
+
       await _saveUserData();
-      
-      // Update in Firestore if user is logged in
+
       final firebaseUser = _firebaseAuth.currentUser;
       if (firebaseUser != null) {
-        // First check if the document exists
-        final docRef = _firestore.collection('users').doc(firebaseUser.uid);
-        final docSnapshot = await docRef.get();
-        
-        final userData = {
-          'name': name,
-          'email': email,
-          'phone': phone,
-          'profileImageUrl': profileImageUrl ?? _user?.profileImageUrl ?? '',
-          'updatedAt': FieldValue.serverTimestamp(),
-        };
-        
-        if (docSnapshot.exists) {
-          // Document exists, update it
-          await docRef.update(userData);
-        } else {
-          // Document doesn't exist, create it
-          userData['createdAt'] = FieldValue.serverTimestamp(); // Add creation timestamp
-          await docRef.set(userData);
-        }
-        
-        // Update email in Firebase Auth if it's changed
-        if (email != firebaseUser.email && email.isNotEmpty) {
-          await firebaseUser.updateEmail(email);
-        }
+        // Update ke Supabase
+        await http.patch(
+          Uri.parse('$supabaseUrl/users?id=eq.${firebaseUser.uid}'),
+          headers: SupabaseConfig.headers,
+          body: json.encode({
+            'name': name,
+            'email': email,
+            'phone': phone,
+            'profileImageUrl': profileImageUrl ?? _user?.profileImageUrl ?? '',
+            'updated_at': DateTime.now().toIso8601String(),
+          }),
+        );
       }
-      
+
+      if (email.isNotEmpty && email != _firebaseAuth.currentUser?.email) {
+        await _firebaseAuth.currentUser?.updateEmail(email);
+      }
+
       notifyListeners();
     } catch (e) {
       debugPrint('Profile update error: $e');
@@ -600,22 +519,40 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Fungsi logout
+  Future<void> _saveUserData() async {
+    if (_user == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('userData', json.encode(_user!.toJson()));
+  }
+
   Future<void> logout() async {
     try {
       _isLoggedIn = false;
       _user = null;
-      
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('isLoggedIn');
       await prefs.remove('userData');
-      
-      await _firebaseAuth.signOut(); // Logout Firebase Auth
-      await _googleSignIn.signOut(); // Logout Google SignIn
+      await _firebaseAuth.signOut();
+      await _googleSignIn.signOut();
     } catch (e) {
-      debugPrint('Error during logout: $e');
+      debugPrint('Logout error: $e');
     } finally {
       notifyListeners();
+    }
+  }
+
+  String _mapVerificationError(String code) {
+    switch (code) {
+      case 'invalid-phone-number':
+        return 'Nomor telepon tidak valid';
+      case 'too-many-requests':
+        return 'Terlalu banyak permintaan. Coba lagi nanti';
+      case 'quota-exceeded':
+        return 'Kuota habis. Hubungi developer';
+      case 'operation-not-allowed':
+        return 'Verifikasi tidak diaktifkan';
+      default:
+        return 'Terjadi kesalahan: $code';
     }
   }
 }
