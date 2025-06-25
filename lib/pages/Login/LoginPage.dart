@@ -14,9 +14,6 @@ import 'package:goodbooks_flutter/base/NavBar.dart';
 import 'package:goodbooks_flutter/pages/Login/RegisterPageEmail.dart';
 import 'package:goodbooks_flutter/pages/Login/ResetPasswordPage.dart';
 
-// Theme
-import 'package:goodbooks_flutter/theme/apptheme.dart';
-
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
