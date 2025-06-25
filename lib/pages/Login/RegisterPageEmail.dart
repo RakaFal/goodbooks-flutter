@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'VerificationPage.dart';
-import "package:goodbooks_flutter/provider/AuthProvider.dart";
-import 'RegisterPageNumber.dart'; // Import halaman RegisterPageNumber
+import "package:goodbooks_flutter/provider/auth_provider.dart";
+import 'RegisterPageNumber.dart'; 
+import 'LoginPage.dart';
 
 class RegisterPageEmail extends StatefulWidget {
   const RegisterPageEmail({super.key});
@@ -49,14 +49,10 @@ class _RegisterPageEmailState extends State<RegisterPageEmail> {
           SnackBar(content: Text("Registrasi berhasil! Kode verifikasi dikirim ke ${user.phone.isNotEmpty ? user.phone : user.email}")),
         );
 
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(
-            builder: (context) => VerificationPage(
-              phoneNumber: user.phone.isNotEmpty ? user.phone : user.email,
-              source: "register",
-            ),
-          ),
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (Route<dynamic> route) => false, // Hapus semua rute sebelumnya
         );
       }
     } catch (e) {

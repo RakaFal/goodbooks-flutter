@@ -1,15 +1,34 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class BannerModel {
-  final String imagePath;
+  final String id;
+  final String imageBase64; // DIUBAH
+  final int order;
+  final bool active;
 
   BannerModel({
-    required this.imagePath
+    required this.id,
+    required this.imageBase64, // DIUBAH
+    required this.order,
+    required this.active,
   });
 
-  static List<BannerModel> getBanners() {
-    return [
-      BannerModel(imagePath: 'assets/images/Iklan_Facebook_Dibalik_Gedung_Merah_Bergaya_Kreatif_Ilustrasi_Biru_dan_Hijau.png'),
-      BannerModel(imagePath: 'assets/images/Hari-Buku-Nasional_Twitter-min.png'),
-      BannerModel(imagePath: 'assets/images/Banner_default.png'),
-    ];
+  factory BannerModel.fromFirestore(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    return BannerModel(
+      id: doc.id,
+      imageBase64: data['imageBase64'] ?? '', // DIUBAH
+      order: data['order'] ?? 99,
+      active: data['active'] ?? false,
+    );
+  }
+  
+  // Method untuk mengubah objek menjadi Map, berguna untuk upload
+  Map<String, dynamic> toJson() {
+    return {
+      'imageBase64': imageBase64,
+      'order': order,
+      'active': active,
+    };
   }
 }

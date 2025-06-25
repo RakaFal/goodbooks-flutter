@@ -1,6 +1,4 @@
-// models/payment_model.dart
-enum PaymentMethod { creditCard, bankTransfer, eWallet }
-
+// Model untuk data kartu kredit
 class PaymentCard {
   final String cardNumber;
   final String cardHolder;
@@ -15,6 +13,7 @@ class PaymentCard {
   });
 }
 
+// Model untuk data transfer bank
 class BankAccount {
   final String bankName;
   final String accountNumber;
@@ -27,14 +26,34 @@ class BankAccount {
   });
 }
 
+// Model untuk data e-wallet
 class EWallet {
   final String walletType;
   final String phoneNumber;
   final double amount;
-
+  
   EWallet({
     required this.walletType,
     required this.phoneNumber,
     required this.amount,
+  });
+}
+
+// Enum untuk metode pembayaran
+enum PaymentMethod { creditCard, bankTransfer, eWallet }
+
+// Enum untuk tipe pengiriman
+enum DeliveryType { digital, physical }
+
+// Class untuk alamat pengiriman
+class ShippingAddress {
+  final String address;
+  final String city;
+  final String postalCode;
+
+  ShippingAddress({
+    required this.address,
+    required this.city,
+    required this.postalCode,
   });
 }

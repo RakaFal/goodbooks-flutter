@@ -1,123 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-class CategoryModels {
-  String name;
-  String iconName;
-  Color boxColor;
 
-  CategoryModels({
+class CategoryModel {
+  final String id;
+  final String name;
+  final String iconName;
+  final String boxColorHex; // DIUBAH: dari Color ke String untuk kode Hex
+  final int order;
+
+  CategoryModel({
+    required this.id,
     required this.name,
     required this.iconName,
-    required this.boxColor,
+    required this.boxColorHex,
+    required this.order,
   });
 
-  static List<CategoryModels> getCategories() {
-    List<CategoryModels> Categories = [];
+  // BARU: Getter untuk mengubah string Hex menjadi objek Color
+  Color get boxColor {
+    // Menghapus karakter '#' jika ada dan memastikan formatnya benar
+    final hexCode = boxColorHex.replaceAll('#', '');
+    return Color(int.parse('FF$hexCode', radix: 16));
+  }
 
-    Categories.add(
-      CategoryModels(
-        name: 'Foods',
-        iconName: 'Foods',
-        boxColor: Colors.green.shade100,
-      )
+  // BARU: Factory constructor dari Firestore
+  factory CategoryModel.fromFirestore(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    return CategoryModel(
+      id: doc.id,
+      name: data['name'] ?? 'No Name',
+      iconName: data['iconName'] ?? 'question',
+      boxColorHex: data['boxColorHex'] ?? 'FFFFFF', // Default ke putih jika tidak ada
+      order: data['order'] ?? 99,
     );
-
-    Categories.add(
-      CategoryModels(
-        name: 'Horror',
-        iconName: 'Horror',
-        boxColor: Colors.red.shade100,
-      )
-    );
-
-    Categories.add(
-      CategoryModels(
-        name: 'Fashion',
-        iconName: 'Fashion',
-        boxColor: Colors.yellow.shade100,
-      )
-    );
-
-    Categories.add(
-      CategoryModels(
-        name: 'Technology',
-        iconName: 'Technology',
-        boxColor: Colors.purple.shade100,
-      )
-    );
-
-    Categories.add(
-      CategoryModels(
-        name: 'Psychology',
-        iconName: 'Psychology',
-        boxColor: Colors.teal.shade100,
-      )
-    );
-
-    Categories.add(
-      CategoryModels(
-        name: 'Romance',
-        iconName: 'Romance',
-        boxColor: Colors.blue.shade100,
-      )
-    );
-
-    Categories.add(
-      CategoryModels(
-        name: 'Fanfiction',
-        iconName: 'Fanfiction',
-        boxColor: Colors.pink.shade100,
-      )
-    );
-
-    Categories.add(
-      CategoryModels(
-        name: 'Science Fiction',
-        iconName: 'Science Fiction',
-        boxColor: Colors.deepPurpleAccent.shade100,
-      )
-    );
-
-    Categories.add(
-      CategoryModels(
-        name: 'Mystery',
-        iconName: 'Mystery',
-        boxColor: Colors.blueGrey.shade100,
-      )
-    );
-
-    Categories.add(
-      CategoryModels(
-        name: 'Fantasy',
-        iconName: 'Fantasy',
-        boxColor: Colors.cyan.shade100,
-      )
-    );
-
-    Categories.add(
-      CategoryModels(
-        name: 'Thriller',
-        iconName: 'Thriller',
-        boxColor: Colors.indigoAccent.shade100,
-      )
-    );
-
-    Categories.add(
-      CategoryModels(
-        name: 'Historical',
-        iconName: 'Historical',
-        boxColor: Colors.brown.shade100,
-      )
-    );
-
-    Categories.add(
-      CategoryModels(
-        name: 'Realistic Fiction',
-        iconName: 'Realistic Fiction',
-        boxColor: Colors.deepOrange.shade100,
-      )
-    );
-    return Categories;
   }
 
   static IconData getIconData(String iconName) {

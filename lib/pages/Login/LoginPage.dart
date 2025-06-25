@@ -9,7 +9,7 @@ import 'package:goodbooks_flutter/bloc/auth_event.dart';
 import 'package:goodbooks_flutter/bloc/auth_state.dart';
 
 // Provider & Pages
-import 'package:goodbooks_flutter/provider/AuthProvider.dart';
+import 'package:goodbooks_flutter/provider/auth_provider.dart';
 import 'package:goodbooks_flutter/base/NavBar.dart';
 import 'package:goodbooks_flutter/pages/Login/RegisterPageEmail.dart';
 import 'package:goodbooks_flutter/pages/Login/ResetPasswordPage.dart';

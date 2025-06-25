@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:goodbooks_flutter/provider/AuthProvider.dart';
+import 'package:goodbooks_flutter/provider/auth_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:goodbooks_flutter/pages/login/ResetPasswordPage.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:convert';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -18,8 +18,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
-  bool _isUploading = false;
+  File? _newImageFile;
+  bool _isLoading = false;
+  bool _isPhotoRemoved = false;
 
+  
   @override
   void initState() {
     super.initState();
@@ -37,64 +40,142 @@ class _EditProfilePageState extends State<EditProfilePage> {
     super.dispose();
   }
 
-  Future<void> _pickAndUploadImage() async {
+  void _handleProfileImageTap() {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (!authProvider.isLoggedIn) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please login first')),
-      );
+    final bool hasExistingImage = authProvider.user?.profileImageBase64.isNotEmpty ?? false;
+
+    // Jika pengguna sudah punya foto (dan foto itu tidak ditandai untuk dihapus), tampilkan opsi
+    if (hasExistingImage && !_isPhotoRemoved) {
+      _showImageOptions();
+    } else {
+      // Jika tidak punya foto, langsung buka galeri
+      _pickImage();
+    }
+  }
+
+  Future<void> _showImageOptions() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (builder) {
+        return SafeArea(
+          child: Wrap(
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Color.fromRGBO(54, 105, 201, 1)),
+                title: const Text('Pilih dari Galeri', style: TextStyle(color: Color.fromRGBO(54, 105, 201, 1), fontWeight: FontWeight.bold)),
+                onTap: () {
+                  _pickImage();
+                  Navigator.of(context).pop();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Hapus Foto', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                onTap: () {
+                  setState(() {
+                    _newImageFile = null;
+                    _isPhotoRemoved = true;
+                  });
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final XFile? pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85, // Kompresi gambar untuk memperkecil ukuran
+    );
+    
+    if (pickedFile == null) return;
+
+    final imageFile = File(pickedFile.path);
+    final int fileSizeInBytes = await imageFile.length();
+    const int maxSizeInBytes = 700 * 1024; // Batas aman 700 KB
+
+    if (fileSizeInBytes > maxSizeInBytes) {
+      // Tampilkan dialog peringatan jika gambar terlalu besar
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Ukuran Gambar Terlalu Besar"),
+            content: Text("Ukuran maksimal adalah 700 KB. Ukuran gambar Anda adalah ${(fileSizeInBytes / 1024).toStringAsFixed(1)} KB."),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text("Mengerti"),
+              ),
+            ],
+          ),
+        );
+      }
+      // Jangan proses gambar, biarkan preview tetap gambar lama/default
+    } else {
+      // Jika ukuran aman, perbarui state untuk menampilkan preview
+      setState(() {
+        _newImageFile = imageFile;
+        _isPhotoRemoved = false;
+      });
+    }
+  }
+
+  // DIUBAH TOTAL: Logika penyimpanan sekarang terpusat di sini
+  Future<void> _saveProfile() async {
+    if (_formKey.currentState!.validate() == false) {
       return;
     }
 
-    final ImagePicker picker = ImagePicker();
-    
+    setState(() => _isLoading = true);
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    // Mulai dengan gambar lama sebagai default
+    String? finalImageBase64 = authProvider.user?.profileImageBase64;
+
     try {
-      final XFile? pickedFile = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 512, // Resize image to reduce storage usage
-        maxHeight: 512,
-        imageQuality: 85,
-      );
+      if (_isPhotoRemoved) {
+        // Jika user memilih hapus, kirim string kosong
+        finalImageBase64 = '';
+      } else if (_newImageFile != null) {
+        // Jika ya, encode gambar baru tersebut menjadi string Base64
+        final imageBytes = await _newImageFile!.readAsBytes();
+        finalImageBase64 = base64Encode(imageBytes);
+      } else {
+        // Jika tidak ada perubahan, gunakan gambar lama
+        finalImageBase64 = authProvider.user?.profileImageBase64;
+      }
 
-      if (pickedFile == null) return; // User canceled the picker
-
-      setState(() {
-        _isUploading = true;
-      });
-
-      // Upload to Firebase Storage
-      final String fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final Reference storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_images')
-          .child(fileName);
-
-      final File imageFile = File(pickedFile.path);
-      final UploadTask uploadTask = storageRef.putFile(imageFile);
-
-      // Get download URL after upload completes
-      final TaskSnapshot taskSnapshot = await uploadTask;
-      final String downloadUrl = await taskSnapshot.ref.getDownloadURL();
-
-      // Update user profile with new image URL
+      // 2. Panggil updateUserProfile satu kali dengan semua data final
       await authProvider.updateUserProfile(
-        name: authProvider.user!.name,
-        email: authProvider.user!.email,
-        phone: authProvider.user!.phone,
-        profileImageUrl: downloadUrl,
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        profileImageBase64: finalImageBase64, // Kirim Base64 baru atau lama
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile picture updated successfully')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profil berhasil diperbarui')),
+        );
+        Navigator.pop(context); // Kembali ke halaman profil
+      }
+
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update profile picture: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menyimpan profil: $e')),
+        );
+      }
     } finally {
-      setState(() {
-        _isUploading = false;
-      });
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -119,121 +200,68 @@ class _EditProfilePageState extends State<EditProfilePage> {
         ),
         actions: [
           TextButton(
-            onPressed: _saveProfile,
+            onPressed: _isLoading ? null : _saveProfile,
             child: const Text(
               'Save',
               style: TextStyle(
                 color: Color.fromRGBO(54, 105, 201, 1),
                 fontWeight: FontWeight.bold,
+                fontSize: 16,
               ),
             ),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              const SizedBox(height: 20),
-              // Make the entire profile image area tappable
-              InkWell(
-                onTap: _isUploading ? null : _pickAndUploadImage,
-                child: Stack(
-                  alignment: Alignment.bottomRight,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Form(
+                key: _formKey,
+                child: Column(
                   children: [
-                    // Profile Image
-                    authProvider.isLoggedIn && authProvider.user?.profileImageUrl.isNotEmpty == true
-                        ? CircleAvatar(
+                    const SizedBox(height: 20),
+                    InkWell(
+                      onTap: _handleProfileImageTap, 
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          CircleAvatar(
                             radius: 50,
-                            backgroundImage: NetworkImage(authProvider.user!.profileImageUrl),
-                            backgroundColor: Colors.grey[300],
-                            onBackgroundImageError: (exception, stackTrace) {
-                              debugPrint('Error loading profile image: $exception');
-                              // Fallback to default image on error
-                            },
-                          )
-                        : const CircleAvatar(
-                            radius: 50,
-                            backgroundImage: AssetImage('assets/images/download.png'),
+                            backgroundColor: Colors.grey[200],
+                            backgroundImage: _isPhotoRemoved
+                              ? const AssetImage('assets/images/download.png') as ImageProvider 
+                              : (_newImageFile != null
+                                  ? FileImage(_newImageFile!)
+                                  : (authProvider.user?.profileImageBase64.isNotEmpty == true
+                                      ? MemoryImage(base64Decode(authProvider.user!.profileImageBase64))
+                                      : const AssetImage('assets/images/download.png')
+                                    ) as ImageProvider),
                           ),
-                    // Edit button overlay
-                    Container(
-                      decoration: BoxDecoration(
-                        color: const Color.fromRGBO(54, 105, 201, 1),
-                        borderRadius: BorderRadius.circular(20),
+                          Container(
+                            decoration: BoxDecoration(color: Color.fromRGBO(54, 105, 201, 1), borderRadius: BorderRadius.circular(20)),
+                            padding: const EdgeInsets.all(6),
+                            child: const Icon(Icons.edit, color: Colors.white, size: 20),
+                          ),
+                        ],
                       ),
-                      padding: const EdgeInsets.all(6),
-                      child: _isUploading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Icon(Icons.edit, color: Colors.white, size: 20),
                     ),
+                    const SizedBox(height: 30),
+                    _buildTextField(controller: _nameController, label: 'Full Name', icon: Icons.person_outline, validator: (v) => v!.isEmpty ? 'Nama tidak boleh kosong' : null),
+                    const SizedBox(height: 20),
+                    _buildTextField(controller: _emailController, label: 'Email', icon: Icons.email_outlined, validator: (v) => v!.isEmpty ? 'Email tidak boleh kosong' : null),
+                    const SizedBox(height: 20),
+                    _buildTextField(controller: _phoneController, label: 'Phone Number', icon: Icons.phone_outlined, validator: (v) => v!.isEmpty ? 'Nomor telepon tidak boleh kosong' : null),
+                    const SizedBox(height: 40),
+                    if (authProvider.isLoggedIn)
+                      TextButton(
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ResetPasswordPage())),
+                        child: const Text('Change Password', style: TextStyle(color: Color.fromRGBO(54, 105, 201, 1), fontSize: 16)),
+                      ),
                   ],
                 ),
               ),
-              const SizedBox(height: 30),
-              _buildTextField(
-                controller: _nameController,
-                label: 'Full Name',
-                icon: Icons.person_outline,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-              _buildTextField(
-                controller: _emailController,
-                label: 'Email',
-                icon: Icons.email_outlined,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your email';
-                  }
-                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                    return 'Please enter a valid email';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-              _buildTextField(
-                controller: _phoneController,
-                label: 'Phone Number',
-                icon: Icons.phone_outlined,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your phone number';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 40),
-              if (authProvider.isLoggedIn)
-                TextButton(
-                  onPressed: _changePassword,
-                  child: const Text(
-                    'Change Password',
-                    style: TextStyle(
-                      color: Color.fromRGBO(54, 105, 201, 1),
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 
@@ -258,30 +286,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
         ),
       ),
       validator: validator,
-    );
-  }
-
-  void _saveProfile() {
-    if (_formKey.currentState!.validate()) {
-      // Save logic here
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      authProvider.updateUserProfile(
-        name: _nameController.text,
-        email: _emailController.text,
-        phone: _phoneController.text,
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile updated successfully')),
-      );
-      Navigator.pop(context);
-    }
-  }
-
-  void _changePassword() {
-    // Navigate to change password page
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => ResetPasswordPage()),
     );
   }
 }

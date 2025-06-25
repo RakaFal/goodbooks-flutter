@@ -1,6 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class ProductModel {
   final String id;
-  final String imagePath;
+  final String imageBase64; 
   final String title;
   final String author;
   final String genre;
@@ -13,10 +15,11 @@ class ProductModel {
   final int pageCount;
   final bool isBestseller;
   final bool isPurchased;
+  final String sellerId; 
 
   ProductModel({
     required this.id,
-    required this.imagePath,
+    required this.imageBase64,
     required this.title,
     required this.author,
     required this.genre,
@@ -29,33 +32,42 @@ class ProductModel {
     required this.pageCount,
     required this.isBestseller,
     required this.isPurchased,
+    required this.sellerId, 
   });
 
-  // Factory dari JSON
-  factory ProductModel.fromJson(Map<String, dynamic> json) {
+  // BARU: Factory constructor untuk membuat objek dari dokumen Firestore.
+  // Ini adalah pengganti utama untuk fromJson/fromMap dalam konteks Firestore.
+  factory ProductModel.fromFirestore(DocumentSnapshot doc) {
+    // Ambil data dari dokumen sebagai Map
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
     return ProductModel(
-      id: json['id'] ?? '',
-      imagePath: json['imagePath'] ?? '',
-      title: json['title'] ?? '',
-      author: json['author'] ?? '',
-      genre: json['genre'] ?? '',
-      publisher: json['publisher'] ?? '',
-      publishedDate: json['publishedDate'] ?? '',
-      description: json['description'] ?? '',
-      price: json['price']?.toDouble() ?? 0.0,
-      rating: json['rating']?.toDouble() ?? 0.0,
-      reviews: json['reviews'] ?? 0,
-      pageCount: json['pageCount'] ?? 0,
-      isBestseller: json['isBestseller'] ?? false,
-      isPurchased: json['isPurchased'] ?? false,
+      id: doc.id, // ID diambil dari ID dokumen itu sendiri
+      // Gunakan 'imageUrl' sesuai dengan perubahan dan praktik terbaik
+      imageBase64: data['imageBase64'] ?? '',
+      title: data['title'] ?? 'No Title',
+      author: data['author'] ?? 'No Author',
+      genre: data['genre'] ?? 'N/A',
+      publisher: data['publisher'] ?? 'N/A',
+      publishedDate: data['publishedDate'] ?? 'N/A',
+      description: data['description'] ?? 'No Description',
+      // Konversi number (bisa int atau double) dari Firestore ke double
+      price: (data['price'] as num?)?.toDouble() ?? 0.0,
+      rating: (data['rating'] as num?)?.toDouble() ?? 0.0,
+      reviews: data['reviews'] ?? 0,
+      pageCount: data['pageCount'] ?? 0,
+      isBestseller: data['isBestseller'] ?? false,
+      isPurchased: data['isPurchased'] ?? false,
+      sellerId: data['sellerId'] ?? '', 
     );
   }
 
-  // Method toJson
+  // Method toJson untuk mengubah objek Dart kembali menjadi Map.
+  // Berguna jika Anda ingin mengirim data ke Firestore.
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
-      'imagePath': imagePath,
+      // 'id' tidak perlu dimasukkan di sini karena sudah menjadi ID dokumen
+      'imageBase64': imageBase64,
       'title': title,
       'author': author,
       'genre': genre,
@@ -68,45 +80,7 @@ class ProductModel {
       'pageCount': pageCount,
       'isBestseller': isBestseller,
       'isPurchased': isPurchased,
+      'sellerId': sellerId,
     };
   }
-
-  factory ProductModel.fromMap(Map<String, dynamic> map) {
-    return ProductModel(
-      id: map['id'] ?? '',
-      imagePath: map['imagePath'] ?? '',
-      title: map['title'] ?? '',
-      author: map['author'] ?? '',
-      genre: map['genre'] ?? '',
-      publisher: map['publisher'] ?? '',
-      publishedDate: map['publishedDate'] ?? '',
-      description: map['description'] ?? '',
-      price: map['price']?.toDouble() ?? 0.0,
-      rating: map['rating']?.toDouble() ?? 0.0,
-      reviews: map['reviews'] ?? 0,
-      pageCount: map['pageCount'] ?? 0,
-      isBestseller: map['isBestseller'] ?? false,
-      isPurchased: map['isPurchased'] ?? false,
-    );
-  }
-
-  // Untuk kirim ke Supabase
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'imagePath': imagePath,
-      'title': title,
-      'author': author,
-      'genre': genre,
-      'publisher': publisher,
-      'publishedDate': publishedDate,
-      'description': description,
-      'price': price,
-      'rating': rating,
-      'reviews': reviews,
-      'pageCount': pageCount,
-      'isBestseller': isBestseller,
-      'isPurchased': isPurchased,
-    };
-}
 }

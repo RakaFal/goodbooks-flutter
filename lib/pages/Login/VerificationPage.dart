@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'ProfilePasswordPage.dart';
 import 'UpdatePasswordPage.dart';
 import 'package:provider/provider.dart';
-import 'package:goodbooks_flutter/provider/AuthProvider.dart'; 
+import 'package:goodbooks_flutter/provider/auth_provider.dart'; 
 
 class VerificationPage extends StatefulWidget {
   final String phoneNumber;

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:goodbooks_flutter/models/product_models.dart';
-import 'CheckoutPage.dart';
+import 'package:goodbooks_flutter/models/payment_models.dart'; // DIUBAH: Import file model yang benar
 import 'CreditCardPage.dart';
 import 'BankTransferPage.dart';
 import 'EWalletPage.dart';
-import 'package:goodbooks_flutter/models/payment_models.dart';
 import 'ReceiptPage.dart';
 
 class PaymentPage extends StatefulWidget {

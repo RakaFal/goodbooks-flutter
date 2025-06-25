@@ -3,145 +3,119 @@ import 'package:image_picker/image_picker.dart';
 import 'package:goodbooks_flutter/models/product_models.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
-import 'dart:convert'; 
-import 'package:goodbooks_flutter/provider/auth_provider.dart';
-import 'package:provider/provider.dart';
+import 'dart:convert';
 
-class AddProductPage extends StatefulWidget {
-  const AddProductPage({super.key});
+
+class EditProductPage extends StatefulWidget {
+  // BARU: Menerima produk yang akan diedit
+  final ProductModel product;
+
+  const EditProductPage({super.key, required this.product});
 
   @override
-  State<AddProductPage> createState() => _AddProductPageState();
+  State<EditProductPage> createState() => _EditProductPageState();
 }
 
-class _AddProductPageState extends State<AddProductPage> {
+class _EditProductPageState extends State<EditProductPage> {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _authorController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _priceController = TextEditingController();
-  final _pageCountController = TextEditingController();
-
+  
+  // DIUBAH: Controller sekarang akan diinisialisasi di initState
+  late TextEditingController _titleController;
+  late TextEditingController _authorController;
+  late TextEditingController _descriptionController;
+  late TextEditingController _priceController;
+  late TextEditingController _pageCountController;
   
   String? _selectedGenre;
   final List<String> _genres = ['Fiksi', 'Non-Fiksi', 'Komik', 'Edukasi', 'Horror', 'Romance', 'Fantasy', 'Misteri', 'Lainnya'];
   
-  File? _imageFile;
+  // DIUBAH: Pisahkan antara gambar baru dan gambar lama
+  File? _newImageFile; // Untuk menampung file gambar BARU yang dipilih
+  String? _existingImageBase64; // Untuk menampung data Base64 LAMA
+  
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // BARU: Isi semua form dengan data dari produk yang dilewatkan
+    _titleController = TextEditingController(text: widget.product.title);
+    _authorController = TextEditingController(text: widget.product.author);
+    _descriptionController = TextEditingController(text: widget.product.description);
+    _priceController = TextEditingController(text: widget.product.price.toStringAsFixed(0));
+    _pageCountController = TextEditingController(text: widget.product.pageCount.toString());
+    _selectedGenre = widget.product.genre;
+    _existingImageBase64 = widget.product.imageBase64;
+  }
 
   Future<void> _pickCoverImage() async {
     final picker = ImagePicker();
-    final XFile? image = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80, // Kompresi gambar untuk memperkecil ukuran
-    );
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
     
-    if (image == null) return; // User membatalkan pemilihan
-
-    final imageFile = File(image.path);
-
-    // BARU: Cek ukuran file di sini
-    final int fileSizeInBytes = await imageFile.length();
-    // Batas aman 700KB (700 * 1024 bytes)
-    const int maxSizeInBytes = 700 * 1024; 
-
-    if (fileSizeInBytes > maxSizeInBytes) {
-      // JIKA UKURAN TERLALU BESAR:
-      // 1. Tampilkan dialog peringatan
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text("Ukuran Gambar Terlalu Besar"),
-            content: Text("Ukuran gambar maksimal adalah 700 KB. Ukuran gambar Anda adalah ${(fileSizeInBytes / 1024).toStringAsFixed(1)} KB."),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text("Mengerti"),
-              ),
-            ],
-          ),
-        );
-      }
-      // 2. Jangan proses gambar ini (kosongkan state)
+    if (image != null) {
       setState(() {
-        _imageFile = null;
-      });
-    } else {
-      // JIKA UKURAN AMAN:
-      // Lanjutkan seperti biasa, tampilkan preview gambar
-      setState(() {
-        _imageFile = imageFile;
+        _newImageFile = File(image.path); // Simpan gambar baru yang dipilih
       });
     }
   }
 
-  Future<void> _submitForm() async {
+  // DIUBAH: Logika submit form menjadi untuk UPDATE
+  Future<void> _updateForm() async {
     if (_formKey.currentState?.validate() != true) return;
-    if (_imageFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Silakan pilih gambar sampul buku.")),
-      );
-      return;
-    }
 
     setState(() => _isLoading = true);
 
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final sellerId = authProvider.user?.id;
+      String imageBase64;
 
-      if (sellerId == null) {
-          // Handle error jika user tidak login
-          throw Exception("User not logged in.");
+      // Cek apakah ada gambar baru yang dipilih
+      if (_newImageFile != null) {
+        // Jika ada, encode gambar baru
+        final imageBytes = await _newImageFile!.readAsBytes();
+        imageBase64 = base64Encode(imageBytes);
+      } else {
+        // Jika tidak, gunakan gambar lama yang sudah ada
+        imageBase64 = _existingImageBase64 ?? '';
       }
 
-      // 1. Baca file gambar menjadi data biner (bytes)
-      final imageBytes = await _imageFile!.readAsBytes();
-
-      // 2. Encode data biner tersebut menjadi string Base64
-      final String base64Image = base64Encode(imageBytes);
-
-      // 3. Buat ID unik untuk produk baru
-      final newProductId = FirebaseFirestore.instance.collection('products').doc().id;
-
-      // 4. Buat objek ProductModel dengan data dari form dan string Base64
-      final newBook = ProductModel(
-        id: newProductId,
-        imageBase64: base64Image, // Menyimpan string Base64
+      // Buat objek produk yang sudah diperbarui
+      final updatedBook = ProductModel(
+        id: widget.product.id, // Gunakan ID yang sudah ada
+        imageBase64: imageBase64,
         title: _titleController.text.trim(),
         author: _authorController.text.trim(),
         description: _descriptionController.text.trim(),
         price: double.tryParse(_priceController.text) ?? 0.0,
         genre: _selectedGenre ?? 'Lainnya',
-        rating: 0.0,
-        reviews: 0,
-        pageCount: int.tryParse(_pageCountController.text) ?? 0, 
-        publisher: 'Self-Published',
-        publishedDate: DateTime.now().toIso8601String(),
-        isBestseller: false,
-        isPurchased: false,
-        sellerId: sellerId, 
+        sellerId: widget.product.sellerId, // Gunakan sellerId yang sudah ada
+        // Field lain bisa di-hardcode atau dibuatkan form inputnya juga
+        rating: widget.product.rating,
+        reviews: widget.product.reviews,
+        pageCount: int.tryParse(_pageCountController.text) ?? 0,
+        publisher: widget.product.publisher,
+        publishedDate: widget.product.publishedDate,
+        isBestseller: widget.product.isBestseller,
+        isPurchased: widget.product.isPurchased,
       );
 
-      // 5. Simpan data produk (yang sudah berisi string Base64) ke Firestore
+      // Lakukan UPDATE ke dokumen yang sudah ada
       await FirebaseFirestore.instance
           .collection('products')
-          .doc(newProductId)
-          .set(newBook.toJson());
+          .doc(widget.product.id) 
+          .update(updatedBook.toJson());
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Buku berhasil ditambahkan")),
+          const SnackBar(content: Text("Buku berhasil diperbarui")),
         );
         Navigator.pop(context);
       }
 
     } catch (e) {
-      debugPrint('Error saat submit form: $e');
+      debugPrint('Error saat update form: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Gagal menambahkan buku: $e")),
+          SnackBar(content: Text("Gagal memperbarui buku: $e")),
         );
       }
     } finally {
@@ -150,7 +124,6 @@ class _AddProductPageState extends State<AddProductPage> {
       }
     }
   }
-
 
   @override
   void dispose() {
@@ -166,13 +139,7 @@ class _AddProductPageState extends State<AddProductPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "Tambah Produk Buku",
-          style: TextStyle(
-            color: Color.fromRGBO(54, 105, 201, 1),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        title: const Text("Edit Produk Buku", style: TextStyle(color: Color.fromRGBO(54, 105, 201, 1), fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
@@ -198,22 +165,18 @@ class _AddProductPageState extends State<AddProductPage> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.grey.shade400),
                   ),
-                  // DIUBAH: Tampilkan gambar dari _imageFile
-                  child: _imageFile != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.file(_imageFile!, fit: BoxFit.cover),
-                        )
-                      : const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_a_photo_outlined, size: 50, color: Colors.grey),
-                              SizedBox(height: 8),
-                              Text("Ketuk untuk memilih sampul", style: TextStyle(color: Colors.grey)),
-                            ],
-                          ),
-                        ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    // DIUBAH: Logika untuk menampilkan preview gambar
+                    child: _newImageFile != null
+                        // 1. Jika ada gambar baru, tampilkan gambar baru
+                        ? Image.file(_newImageFile!, fit: BoxFit.cover)
+                        // 2. Jika tidak, tampilkan gambar lama dari Base64
+                        : (_existingImageBase64?.isNotEmpty == true
+                            ? Image.memory(base64Decode(_existingImageBase64!), fit: BoxFit.cover)
+                            // 3. Jika tidak ada sama sekali, tampilkan ikon
+                            : const Center(child: Icon(Icons.image, size: 80))),
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -275,7 +238,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
               // Submit Button
               ElevatedButton(
-                onPressed: _isLoading ? null : _submitForm,
+                onPressed: _isLoading ? null : _updateForm,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color.fromRGBO(54, 105, 201, 1),
                   padding: const EdgeInsets.symmetric(vertical: 16),

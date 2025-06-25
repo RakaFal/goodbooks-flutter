@@ -1,5 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:goodbooks_flutter/provider/AuthProvider.dart';
+import 'package:goodbooks_flutter/provider/auth_provider.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 

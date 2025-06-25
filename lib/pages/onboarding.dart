@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:goodbooks_flutter/base/navbar.dart';
 import 'package:provider/provider.dart';
-import 'package:goodbooks_flutter/provider/AuthProvider.dart';
+import 'package:goodbooks_flutter/provider/auth_provider.dart';
 
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key});

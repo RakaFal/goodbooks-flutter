@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:goodbooks_flutter/pages/home.dart';
 import 'package:goodbooks_flutter/pages/library.dart';
 import 'package:goodbooks_flutter/pages/profile/profile.dart';
-import 'package:goodbooks_flutter/pages/Wishlist.dart'; // Corrected path
+import 'package:goodbooks_flutter/pages/Wishlist.dart'; 
 import 'package:provider/provider.dart';
-import 'package:goodbooks_flutter/provider/AuthProvider.dart';
+import 'package:goodbooks_flutter/provider/auth_provider.dart';
 import 'package:goodbooks_flutter/pages/Login/LoginPage.dart';
 
 class NavBar extends StatefulWidget {
